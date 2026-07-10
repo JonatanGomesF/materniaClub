@@ -34,16 +34,19 @@ function Navbar() {
   return (
     <header className="topbar">
       <Link className="brand" to="/">
-        <span className="brand-mark">m</span>
+        <span className="brand-mark">
+          <img src="/maternia-logo.png" alt="Logo materniaClub" />
+        </span>
         <span>materniaClub</span>
       </Link>
 
       <nav className="nav-links" aria-label="Navegacao principal">
         <NavLink to="/">Feed</NavLink>
         <NavLink to="/marketplace">Marketplace</NavLink>
+        <NavLink to="/lojas">Lojas</NavLink>
         <NavLink to="/chat">Chat</NavLink>
         <NavLink to="/perfil">Perfil</NavLink>
-        <NavLink to="/admin">Admin</NavLink>
+        {["admin", "moderator"].includes(account?.role) && <NavLink to="/admin">Admin</NavLink>}
       </nav>
 
       <div className="nav-account">

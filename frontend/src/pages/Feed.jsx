@@ -93,16 +93,6 @@ function Feed() {
         <div className="hero-photo" aria-hidden="true" />
       </section>
 
-      <aside className="side-panel">
-        <h2>Atalhos quentinhos</h2>
-        <div className="quick-list">
-          <span>Fraldas em promocao</span>
-          <span>Mamadeiras e chupetas</span>
-          <span>Carrinhos seminovos</span>
-          <span>Bebe conforto</span>
-        </div>
-      </aside>
-
       <section className="content-column">
         <form className="composer" onSubmit={createPost}>
           <div className="composer-top">

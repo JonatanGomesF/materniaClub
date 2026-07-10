@@ -4,11 +4,14 @@
 
 drop table if exists public.messages cascade;
 drop table if exists public.conversations cascade;
+drop table if exists public.store_products cascade;
+drop table if exists public.stores cascade;
 drop table if exists public.product_images cascade;
 drop table if exists public.deal_alerts cascade;
 drop table if exists public.reports cascade;
 drop table if exists public.comments cascade;
 drop table if exists public.likes cascade;
+drop table if exists public.product_likes cascade;
 drop table if exists public.products cascade;
 drop table if exists public.posts cascade;
 drop table if exists public.categories cascade;
@@ -64,12 +67,49 @@ create table public.products (
   updated_at timestamptz not null default now()
 );
 
+create table public.stores (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.profiles(id) on delete cascade,
+  name text not null,
+  cnpj text not null,
+  city text,
+  description text,
+  logo_url text,
+  status text not null default 'active' check (status in ('active', 'hidden', 'removed')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (owner_id),
+  unique (cnpj)
+);
+
+create table public.store_products (
+  id uuid primary key default gen_random_uuid(),
+  store_id uuid not null references public.stores(id) on delete cascade,
+  title text not null,
+  description text,
+  price numeric(10,2) not null check (price >= 0),
+  category text not null,
+  city text,
+  image_url text,
+  status text not null default 'active' check (status in ('active', 'hidden', 'removed')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table public.likes (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
   post_id uuid not null references public.posts(id) on delete cascade,
   created_at timestamptz not null default now(),
   unique (user_id, post_id)
+);
+
+create table public.product_likes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  product_id uuid not null references public.products(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (user_id, product_id)
 );
 
 create table public.comments (
@@ -140,6 +180,12 @@ for each row execute function public.set_updated_at();
 create trigger products_updated_at before update on public.products
 for each row execute function public.set_updated_at();
 
+create trigger stores_updated_at before update on public.stores
+for each row execute function public.set_updated_at();
+
+create trigger store_products_updated_at before update on public.store_products
+for each row execute function public.set_updated_at();
+
 create or replace function public.is_admin()
 returns boolean as $$
   select exists (
@@ -154,7 +200,10 @@ alter table public.profiles enable row level security;
 alter table public.categories enable row level security;
 alter table public.posts enable row level security;
 alter table public.products enable row level security;
+alter table public.stores enable row level security;
+alter table public.store_products enable row level security;
 alter table public.likes enable row level security;
+alter table public.product_likes enable row level security;
 alter table public.comments enable row level security;
 alter table public.reports enable row level security;
 alter table public.conversations enable row level security;
@@ -177,9 +226,38 @@ create policy "products owner insert" on public.products for insert with check (
 create policy "products owner update" on public.products for update using (seller_id = auth.uid() or public.is_admin()) with check (seller_id = auth.uid() or public.is_admin());
 create policy "products owner delete" on public.products for delete using (seller_id = auth.uid() or public.is_admin());
 
+create policy "stores public read" on public.stores for select using (status = 'active' or owner_id = auth.uid() or public.is_admin());
+create policy "stores owner insert" on public.stores for insert with check (auth.uid() = owner_id);
+create policy "stores owner update" on public.stores for update using (auth.uid() = owner_id or public.is_admin()) with check (auth.uid() = owner_id or public.is_admin());
+create policy "stores owner delete" on public.stores for delete using (auth.uid() = owner_id or public.is_admin());
+
+create policy "store products public read" on public.store_products for select using (
+  status = 'active'
+  or exists (select 1 from public.stores s where s.id = store_id and s.owner_id = auth.uid())
+  or public.is_admin()
+);
+create policy "store products owner insert" on public.store_products for insert with check (
+  exists (select 1 from public.stores s where s.id = store_id and s.owner_id = auth.uid())
+);
+create policy "store products owner update" on public.store_products for update using (
+  exists (select 1 from public.stores s where s.id = store_id and s.owner_id = auth.uid())
+  or public.is_admin()
+) with check (
+  exists (select 1 from public.stores s where s.id = store_id and s.owner_id = auth.uid())
+  or public.is_admin()
+);
+create policy "store products owner delete" on public.store_products for delete using (
+  exists (select 1 from public.stores s where s.id = store_id and s.owner_id = auth.uid())
+  or public.is_admin()
+);
+
 create policy "likes owner read" on public.likes for select using (true);
 create policy "likes owner insert" on public.likes for insert with check (auth.uid() = user_id);
 create policy "likes owner delete" on public.likes for delete using (auth.uid() = user_id or public.is_admin());
+
+create policy "product likes public read" on public.product_likes for select using (true);
+create policy "product likes owner insert" on public.product_likes for insert with check (auth.uid() = user_id);
+create policy "product likes owner delete" on public.product_likes for delete using (auth.uid() = user_id or public.is_admin());
 
 create policy "comments public read" on public.comments for select using (status = 'published' or user_id = auth.uid() or public.is_admin());
 create policy "comments owner insert" on public.comments for insert with check (auth.uid() = user_id);

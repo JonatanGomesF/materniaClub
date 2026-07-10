@@ -1,12 +1,19 @@
+import { useNavigate } from "react-router-dom";
+
 function PostCard({ post, onReport }) {
+  const navigate = useNavigate();
   const author = post.profiles?.full_name || "Mae da comunidade";
   const city = post.profiles?.city || "materniaClub";
   const date = post.created_at
     ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(post.created_at))
     : "";
 
+  function openProfile() {
+    if (post.author_id) navigate(`/maes/${post.author_id}`);
+  }
+
   return (
-    <article className="post-card">
+    <article className="post-card clickable-card" onClick={openProfile}>
       <div className="card-header">
         <div className="avatar">{author.charAt(0)}</div>
         <div>
@@ -23,9 +30,12 @@ function PostCard({ post, onReport }) {
       ) : null}
 
       <div className="card-actions">
-        <button className="soft-button">Curtir</button>
-        <button className="soft-button">Comentar</button>
-        <button className="ghost-button" onClick={() => onReport?.(post)}>Denunciar</button>
+        <button className="soft-button" onClick={(event) => event.stopPropagation()}>Curtir</button>
+        <button className="soft-button" onClick={(event) => event.stopPropagation()}>Comentar</button>
+        <button className="ghost-button" onClick={(event) => {
+          event.stopPropagation();
+          onReport?.(post);
+        }}>Denunciar</button>
       </div>
     </article>
   );
