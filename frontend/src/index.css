@@ -1711,6 +1711,7 @@ select:focus {
   .feed-layout,
   .marketplace-layout,
   .marketplace-feature-panel,
+  .stores-dashboard,
   .profile-layout,
   .admin-layout,
   .chat-layout,
@@ -1743,6 +1744,86 @@ select:focus {
     min-height: auto;
   }
 
+  .stores-dashboard {
+    gap: 14px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 12px;
+    overflow: hidden;
+  }
+
+  .stores-dashboard *,
+  .stores-page,
+  .stores-sidebar,
+  .stores-hero-dark,
+  .store-admin-panel,
+  .store-showcase {
+    min-width: 0;
+  }
+
+  .stores-sidebar {
+    position: static;
+    min-height: auto;
+    padding: 12px;
+  }
+
+  .stores-side-nav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .stores-side-nav button,
+  .stores-side-nav a {
+    min-height: 44px;
+    padding: 10px 8px;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .stores-side-note {
+    display: none;
+  }
+
+  .stores-hero-dark {
+    grid-template-columns: 1fr;
+    min-height: auto;
+    padding: 24px;
+  }
+
+  .stores-hero-dark h1 {
+    max-width: 100%;
+    font-size: clamp(2.25rem, 9vw, 4rem);
+    line-height: 1.03;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  .stores-hero-dark p {
+    max-width: 100%;
+    line-height: 1.55;
+  }
+
+  .store-view-switch {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
+  }
+
+  .store-view-switch .primary-button,
+  .store-view-switch .soft-button {
+    width: 100%;
+  }
+
+  .store-metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .store-panel-title {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .feed-layout {
     grid-template-columns: minmax(0, 720px);
   }
@@ -1761,6 +1842,56 @@ select:focus {
   main,
   .topbar {
     width: min(100% - 20px, 1180px);
+  }
+
+  .stores-dashboard {
+    padding: 10px;
+    border-radius: 8px;
+  }
+
+  .stores-sidebar {
+    gap: 12px;
+  }
+
+  .stores-brand {
+    justify-content: center;
+  }
+
+  .stores-side-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stores-side-nav button,
+  .stores-side-nav a {
+    font-size: 0.88rem;
+  }
+
+  .stores-hero-dark {
+    padding: 20px;
+  }
+
+  .stores-hero-dark h1 {
+    font-size: clamp(2rem, 11vw, 3rem);
+    line-height: 1.04;
+  }
+
+  .stores-hero-dark p {
+    font-size: 0.96rem;
+  }
+
+  .store-view-switch,
+  .store-metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .store-metric-card {
+    min-height: auto;
+    padding: 16px;
+  }
+
+  .store-admin-panel,
+  .store-showcase {
+    padding: 16px;
   }
 
   .composer-top,
