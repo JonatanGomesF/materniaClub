@@ -10,6 +10,15 @@ function Chat() {
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState("");
 
+  function getConversationProduct(conversation) {
+    return conversation?.products || conversation?.store_products || null;
+  }
+
+  function getConversationTitle(conversation) {
+    const product = getConversationProduct(conversation);
+    return product?.title || "Conversa do marketplace";
+  }
+
   async function loadMessages(conversationId) {
     if (!supabase || !conversationId) return;
 
@@ -28,11 +37,22 @@ function Chat() {
       setSession(currentSession);
       if (!supabase || !currentSession?.user) return;
 
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from("conversations")
-        .select("*, products(title, image_url)")
+        .select("*, products(title, image_url), store_products(title, image_url, stores(name))")
         .or(`buyer_id.eq.${currentSession.user.id},seller_id.eq.${currentSession.user.id}`)
         .order("created_at", { ascending: false });
+
+      if (error) {
+        const fallback = await supabase
+          .from("conversations")
+          .select("*, products(title, image_url)")
+          .or(`buyer_id.eq.${currentSession.user.id},seller_id.eq.${currentSession.user.id}`)
+          .order("created_at", { ascending: false });
+
+        data = fallback.data;
+        error = fallback.error;
+      }
 
       if (error) return;
 
@@ -88,7 +108,7 @@ function Chat() {
                 loadMessages(conversation.id);
               }}
             >
-              {conversation.products?.title || "Conversa do marketplace"}
+              {getConversationTitle(conversation)}
             </button>
           ))}
         </aside>
@@ -97,8 +117,8 @@ function Chat() {
           {activeConversation ? (
             <>
               <div className="chat-product-strip">
-                {activeConversation.products?.image_url && <img src={activeConversation.products.image_url} alt="" />}
-                <strong>{activeConversation.products?.title || "Produto do marketplace"}</strong>
+                {getConversationProduct(activeConversation)?.image_url && <img src={getConversationProduct(activeConversation).image_url} alt="" />}
+                <strong>{getConversationTitle(activeConversation)}</strong>
               </div>
 
               <div className="message-list">

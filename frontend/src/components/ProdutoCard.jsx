@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 
-function ProdutoCard({ currentUserId, onDelete, onInterest, onLike, onReport, produto, profilePath, userLocation }) {
+function ProdutoCard({ currentUserId, interestLabel = "Tenho interesse", onDelete, onInterest, onLike, onReport, produto, profilePath, userLocation }) {
   const navigate = useNavigate();
   const price = Number(produto.price ?? produto.preco ?? 0).toLocaleString("pt-BR", {
     style: "currency",
@@ -74,7 +74,7 @@ function ProdutoCard({ currentUserId, onDelete, onInterest, onLike, onReport, pr
             {!isOwner && onInterest && <button className="primary-button" onClick={(event) => {
               event.stopPropagation();
               onInterest(produto);
-            }}>Tenho interesse</button>}
+            }}>{interestLabel}</button>}
             {isOwner && onDelete && <button className="danger-button" onClick={(event) => {
               event.stopPropagation();
               onDelete(produto);

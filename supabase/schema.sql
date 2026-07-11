@@ -136,10 +136,12 @@ create table public.reports (
 create table public.conversations (
   id uuid primary key default gen_random_uuid(),
   product_id uuid references public.products(id) on delete set null,
+  store_product_id uuid references public.store_products(id) on delete set null,
   buyer_id uuid not null references public.profiles(id) on delete cascade,
   seller_id uuid not null references public.profiles(id) on delete cascade,
   created_at timestamptz not null default now(),
-  unique (product_id, buyer_id, seller_id)
+  unique (product_id, buyer_id, seller_id),
+  unique (store_product_id, buyer_id, seller_id)
 );
 
 create table public.messages (

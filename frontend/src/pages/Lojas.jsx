@@ -195,6 +195,85 @@ function Lojas() {
     loadStores(session);
   }
 
+  async function startStoreConversation(product) {
+    if (!supabase || !session?.user) {
+      alert("Faca login para comprar produtos das lojas.");
+      return;
+    }
+
+    if (product.seller_id === session.user.id) {
+      alert("Voce esta administrando esta loja.");
+      return;
+    }
+
+    try {
+      await ensureUserProfile(session.user);
+
+      const baseConversation = {
+        buyer_id: session.user.id,
+        seller_id: product.seller_id,
+      };
+
+      let conversation = null;
+
+      const { data: existingStoreConversation, error: existingStoreError } = await supabase
+        .from("conversations")
+        .select("*")
+        .eq("store_product_id", product.id)
+        .eq("buyer_id", session.user.id)
+        .eq("seller_id", product.seller_id)
+        .maybeSingle();
+
+      if (!existingStoreError) {
+        conversation = existingStoreConversation;
+      }
+
+      if (!conversation && !existingStoreError) {
+        const { data: createdStoreConversation, error: createStoreError } = await supabase
+          .from("conversations")
+          .insert({ ...baseConversation, store_product_id: product.id })
+          .select()
+          .maybeSingle();
+
+        if (createStoreError) throw createStoreError;
+        conversation = createdStoreConversation;
+      }
+
+      if (!conversation && existingStoreError) {
+        const { data: existingConversation } = await supabase
+          .from("conversations")
+          .select("*")
+          .is("product_id", null)
+          .eq("buyer_id", session.user.id)
+          .eq("seller_id", product.seller_id)
+          .maybeSingle();
+
+        conversation = existingConversation;
+
+        if (!conversation) {
+          const { data: createdConversation, error: createError } = await supabase
+            .from("conversations")
+            .insert(baseConversation)
+            .select()
+            .maybeSingle();
+
+          if (createError) throw createError;
+          conversation = createdConversation;
+        }
+      }
+
+      await supabase.from("messages").insert({
+        conversation_id: conversation.id,
+        sender_id: session.user.id,
+        body: `Quero comprar na loja: ${product.title}`,
+      });
+
+      window.location.href = `/chat?conversation=${conversation.id}`;
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
   const selectedStoreProducts = selectedStore
     ? storeProducts.filter((product) => product.store_id === selectedStore.id)
     : [];
@@ -403,7 +482,14 @@ function Lojas() {
               ) : (
                 <div className="product-grid">
                   {publicProducts.map((product) => (
-                    <ProdutoCard key={product.id} produto={product} profilePath={null} />
+                    <ProdutoCard
+                      key={product.id}
+                      produto={product}
+                      currentUserId={session?.user?.id}
+                      interestLabel="Comprar"
+                      onInterest={startStoreConversation}
+                      profilePath={null}
+                    />
                   ))}
                 </div>
               )}
