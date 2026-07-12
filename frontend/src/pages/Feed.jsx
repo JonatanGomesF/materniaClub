@@ -22,22 +22,28 @@ function Feed() {
 
     const { data, error } = await supabase
       .from("posts")
-      .select("*, profiles(full_name, city, status, avatar_url)")
+      .select("*, profiles(full_name, city, status, avatar_url, account_type)")
       .eq("status", "published")
       .order("created_at", { ascending: false });
 
     if (error) return;
 
-    const ids = (data || []).map((post) => post.id);
-    if (ids.length === 0) {
-      setPosts([]);
-      return;
-    }
+    const { data: storeProducts, error: storeProductsError } = await supabase
+      .from("store_products")
+      .select("*, stores(name, city, logo_url, owner_id, status)")
+      .eq("status", "active")
+      .order("created_at", { ascending: false });
 
-    const { data: likes, error: likesError } = await supabase
-      .from("likes")
-      .select("post_id,user_id")
-      .in("post_id", ids);
+    if (storeProductsError) return;
+
+    const ids = (data || []).map((post) => post.id);
+    let likes = [];
+    let likesError = null;
+    if (ids.length > 0) {
+      const result = await supabase.from("likes").select("post_id,user_id").in("post_id", ids);
+      likes = result.data || [];
+      likesError = result.error;
+    }
 
     if (likesError && !isMissingLikesTable(likesError)) return;
 
@@ -50,7 +56,26 @@ function Feed() {
       };
     });
 
-    setPosts(enriched);
+    const commercialPosts = (storeProducts || []).map((product) => ({
+      id: `store-product-${product.id}`,
+      store_product_id: product.id,
+      author_id: product.stores?.owner_id,
+      body: product.description || product.title,
+      title: product.title,
+      price: product.price,
+      category: product.category || "oferta",
+      image_url: product.image_url,
+      created_at: product.created_at,
+      is_store_publication: true,
+      profiles: {
+        full_name: product.stores?.name || "Loja parceira",
+        city: product.city || product.stores?.city,
+        avatar_url: product.stores?.logo_url,
+        account_type: "store",
+      },
+    }));
+
+    setPosts([...enriched, ...commercialPosts].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
   }, []);
 
   useEffect(() => {
@@ -69,6 +94,8 @@ function Feed() {
       .on("postgres_changes", { event: "*", schema: "public", table: "likes" }, () => {
         fetchPosts(session);
       })
+      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => fetchPosts(session))
+      .on("postgres_changes", { event: "*", schema: "public", table: "store_products" }, () => fetchPosts(session))
       .subscribe();
 
     return () => {
@@ -279,10 +306,10 @@ function Feed() {
             currentUserId={session?.user?.id}
             key={post.id}
             post={post}
-            onDelete={deletePost}
-            onLike={toggleLike}
-            onReport={reportPost}
-            onUpdate={updatePost}
+            onDelete={post.is_store_publication ? null : deletePost}
+            onLike={post.is_store_publication ? null : toggleLike}
+            onReport={post.is_store_publication ? null : reportPost}
+            onUpdate={post.is_store_publication ? null : updatePost}
           />
         ))}
       </section>

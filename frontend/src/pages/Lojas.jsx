@@ -393,7 +393,9 @@ function Lojas() {
         </Link>
         <nav className="stores-side-nav" aria-label="Navegacao de lojas">
           <button className={activeView === "showcase" ? "active" : ""} onClick={openShowcase}>Vitrine</button>
-          <button className={activeView === "manage" ? "active" : ""} onClick={() => setActiveView("manage")}>Minha loja</button>
+          {profile?.account_type === "store" && (
+            <button className={activeView === "manage" ? "active" : ""} onClick={() => setActiveView("manage")}>Minha loja</button>
+          )}
           <Link to="/marketplace">Marketplace</Link>
           <Link to="/chat">Chat</Link>
         </nav>
@@ -412,7 +414,9 @@ function Lojas() {
           </div>
           <div className="store-view-switch">
             <button className={activeView === "showcase" ? "primary-button" : "soft-button"} onClick={openShowcase}>Ver vitrine</button>
-            <button className={activeView === "manage" ? "primary-button" : "soft-button"} onClick={() => setActiveView("manage")}>Minha loja</button>
+            {profile?.account_type === "store" && (
+              <button className={activeView === "manage" ? "primary-button" : "soft-button"} onClick={() => setActiveView("manage")}>Minha loja</button>
+            )}
           </div>
         </section>
 

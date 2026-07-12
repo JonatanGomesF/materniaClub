@@ -28,3 +28,5 @@ create policy "product likes owner delete"
 on public.product_likes
 for delete
 using (auth.uid() = user_id or public.is_admin());
+
+notify pgrst, 'reload schema';

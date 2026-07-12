@@ -17,6 +17,25 @@ create table if not exists public.stores (
 alter table public.stores
 add column if not exists cnpj text;
 
+alter table public.profiles
+add column if not exists account_type text not null default 'user';
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'profiles_account_type_check'
+  ) then
+    alter table public.profiles
+    add constraint profiles_account_type_check check (account_type in ('user', 'store'));
+  end if;
+end $$;
+
+alter table public.stores
+add column if not exists logo_url text;
+
+alter table public.stores
+add column if not exists cover_url text;
+
 create unique index if not exists stores_cnpj_unique
 on public.stores (cnpj)
 where cnpj is not null;
@@ -74,3 +93,5 @@ create policy "store products owner delete" on public.store_products for delete 
   exists (select 1 from public.stores s where s.id = store_id and s.owner_id = auth.uid())
   or public.is_admin()
 );
+
+notify pgrst, 'reload schema';

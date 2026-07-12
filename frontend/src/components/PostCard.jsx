@@ -16,6 +16,8 @@ function PostCard({ post, onDelete, onLike, onReport, onUpdate, currentUserId })
   const [editingBody, setEditingBody] = useState("");
   const [loadingComments, setLoadingComments] = useState(true);
   const [now, setNow] = useState(() => Date.now());
+  const isStorePublication = post.is_store_publication || post.profiles?.account_type === "store";
+  const isStoreProduct = Boolean(post.store_product_id);
   const author = post.profiles?.full_name || "Mae da comunidade";
   const city = post.profiles?.city || "materniaClub";
   const date = post.created_at
@@ -30,11 +32,18 @@ function PostCard({ post, onDelete, onLike, onReport, onUpdate, currentUserId })
     : null;
 
   function openProfile() {
+    if (isStorePublication) {
+      navigate("/lojas");
+      return;
+    }
     if (post.author_id) navigate(`/maes/${post.author_id}`);
   }
 
   async function loadComments() {
-    if (!supabase || !post.id) return;
+    if (!supabase || !post.id || isStoreProduct) {
+      setLoadingComments(false);
+      return;
+    }
     setLoadingComments(true);
     const { data, error } = await supabase.from("comments").select("*, profiles(full_name, avatar_url)").eq("post_id", post.id).eq("status", "published").order("created_at", { ascending: true });
     if (error) alert(error.message);
@@ -60,7 +69,7 @@ function PostCard({ post, onDelete, onLike, onReport, onUpdate, currentUserId })
     return () => {
       active = false;
     };
-  }, [post.id]);
+  }, [isStoreProduct, post.id]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30000);
@@ -134,7 +143,10 @@ function PostCard({ post, onDelete, onLike, onReport, onUpdate, currentUserId })
           {post.profiles?.avatar_url ? <img src={post.profiles.avatar_url} alt="" /> : author.charAt(0)}
         </div>
         <div>
-          <h3>{author}</h3>
+          <div className="post-author-line">
+            <h3>{author}</h3>
+            {isStorePublication && <span className="verified-store-badge" title="Conta comercial verificada pela plataforma"><span aria-hidden="true">✓</span> Loja verificada</span>}
+          </div>
           <p>{city} · {date}</p>
         </div>
         <span className="tag">{post.category || "conversa"}</span>
@@ -162,7 +174,10 @@ function PostCard({ post, onDelete, onLike, onReport, onUpdate, currentUserId })
           </div>
         </form>
       ) : (
-        <p className="post-body">{post.body || post.texto}</p>
+        <div>
+          {isStoreProduct && <h3 className="store-product-title">{post.title}</h3>}
+          <p className="post-body">{post.body || post.texto}</p>
+        </div>
       )}
 
       {price && <strong className="post-price">{price}</strong>}
@@ -172,7 +187,8 @@ function PostCard({ post, onDelete, onLike, onReport, onUpdate, currentUserId })
       ) : null}
 
       <div className="card-actions">
-        <span className="post-like-count">{likesCount} {likesCount === 1 ? "curtida" : "curtidas"}</span>
+        {!isStoreProduct && <span className="post-like-count">{likesCount} {likesCount === 1 ? "curtida" : "curtidas"}</span>}
+        {isStoreProduct && <button className="primary-button small" onClick={(event) => { event.stopPropagation(); navigate("/lojas"); }}>Ver oferta na loja</button>}
         {onLike && (
           <button className={post.liked_by_me ? "soft-button active-like" : "soft-button"} onClick={(event) => {
             event.stopPropagation();
@@ -181,11 +197,11 @@ function PostCard({ post, onDelete, onLike, onReport, onUpdate, currentUserId })
             {post.liked_by_me ? "Curtiu" : "Curtir"}
           </button>
         )}
-        <button className="soft-button" onClick={toggleComments}>{commentsOpen ? "Ocultar comentarios" : "Ver comentarios"}</button>
-        <button className="ghost-button" onClick={(event) => {
+        {!isStoreProduct && <button className="soft-button" onClick={toggleComments}>{commentsOpen ? "Ocultar comentarios" : "Ver comentarios"}</button>}
+        {onReport && <button className="ghost-button" onClick={(event) => {
           event.stopPropagation();
           onReport?.(post);
-        }}>Denunciar</button>
+        }}>Denunciar</button>}
         {isOwner && canEditPost && onUpdate && <button className="soft-button" onClick={startPostEdit}>Editar publicacao</button>}
         {isOwner && onDelete && <button className="danger-button" onClick={(event) => {
           event.stopPropagation();
@@ -194,7 +210,7 @@ function PostCard({ post, onDelete, onLike, onReport, onUpdate, currentUserId })
         {isOwner && !canEditPost && <span className="post-lock-note">Edicao encerrada</span>}
       </div>
 
-      {commentsOpen && <section className="comments-panel" onClick={(event) => event.stopPropagation()}>
+      {!isStoreProduct && commentsOpen && <section className="comments-panel" onClick={(event) => event.stopPropagation()}>
         <h4>Comentarios</h4>
         {loadingComments ? <p className="hint">Carregando comentarios...</p> : comments.length === 0 ? <p className="hint">Seja a primeira pessoa a comentar.</p> : <div className="comment-list">
           {comments.map((comment) => <article className="comment-item" key={comment.id}>

@@ -552,6 +552,42 @@ select:focus {
   padding: 18px;
 }
 
+.post-author-line {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.post-author-line h3 { margin: 0; }
+
+.verified-store-badge {
+  align-items: center;
+  background: rgba(22, 163, 74, 0.12);
+  border: 1px solid rgba(22, 163, 74, 0.34);
+  border-radius: 999px;
+  color: #15803d;
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 900;
+  gap: 5px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+.verified-store-badge > span {
+  align-items: center;
+  background: #16a34a;
+  border-radius: 50%;
+  color: #fff;
+  display: inline-flex;
+  height: 15px;
+  justify-content: center;
+  width: 15px;
+}
+
+.store-product-title { margin: 0 0 6px; }
+
 .comments-panel {
   border-top: 1px solid rgba(104, 69, 84, 0.16);
   margin-top: 2px;

@@ -17,11 +17,36 @@ export async function getCurrentSession() {
 
   if (!session?.user) return { session: null, profile: null };
 
-  const { data: profile } = await supabase
+  const { data: loadedProfile } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", session.user.id)
     .maybeSingle();
+
+  let profile = loadedProfile;
+
+  // A loja pode ter sido criada antes de o perfil ser sincronizado, ou por uma
+  // versao antiga do login que redefinia account_type para "user". A relacao de
+  // propriedade da loja e a fonte mais confiavel para recuperar esse acesso.
+  if (profile && profile.account_type !== "store") {
+    const { data: ownedStore } = await supabase
+      .from("stores")
+      .select("id")
+      .eq("owner_id", session.user.id)
+      .maybeSingle();
+
+    if (ownedStore) {
+      const { data: repairedProfile, error } = await supabase
+        .from("profiles")
+        .update({ account_type: "store" })
+        .eq("id", session.user.id)
+        .select()
+        .maybeSingle();
+
+      if (!error && repairedProfile) profile = repairedProfile;
+      else profile = { ...profile, account_type: "store" };
+    }
+  }
 
   return { session, profile };
 }
@@ -51,20 +76,48 @@ export async function ensureUserProfile(user, fallback = {}) {
 
   const fullName = fallback.full_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "Usuaria";
 
+  const { data: existingProfile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  // Nunca substitua classificacao, permissao ou dados do perfil durante um
+  // login comum. Atualizamos apenas os campos explicitamente fornecidos.
+  if (existingProfile) {
+    const updates = {};
+    for (const field of ["full_name", "city", "motherhood_stage", "account_type", "role", "status"]) {
+      if (fallback[field] !== undefined) updates[field] = fallback[field];
+    }
+
+    if (Object.keys(updates).length === 0) return existingProfile;
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .update(updates)
+      .eq("id", user.id)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      console.warn("Nao foi possivel sincronizar o perfil:", error.message);
+      return existingProfile;
+    }
+
+    return data;
+  }
+
   const { data, error } = await supabase
     .from("profiles")
-    .upsert(
-      {
-        id: user.id,
-        full_name: fullName,
-        city: fallback.city || null,
-        motherhood_stage: fallback.motherhood_stage || "gestante",
-        account_type: fallback.account_type || "user",
-        role: fallback.role || "user",
-        status: "active",
-      },
-      { onConflict: "id" },
-    )
+    .insert({
+      id: user.id,
+      full_name: fullName,
+      city: fallback.city || null,
+      motherhood_stage: fallback.motherhood_stage || "gestante",
+      account_type: fallback.account_type || user.user_metadata?.account_type || "user",
+      role: fallback.role || "user",
+      status: "active",
+    })
     .select()
     .maybeSingle();
 
