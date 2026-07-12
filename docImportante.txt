@@ -1,0 +1,77 @@
+mmf44546@gmail.com
+senha: 41562209
+
+
+
+
+
+O principal ponto a melhorar agora é a segurança das contas e o significado de “Loja verificada”.
+Prioridade alta
+Verificação real de lojas
+Hoje qualquer pessoa consegue cadastrar uma loja e recebe o selo “Loja verificada”. O ideal é:
+Loja inicia como pending.
+Admin analisa CNPJ e informações.
+Somente depois muda para verified.
+Apenas lojas aprovadas recebem o selo verde e publicam no Feed.
+Antes da aprovação, o texto deveria ser “Loja” ou “Aguardando verificação”, sem o certinho verde.
+Proteger tipos de conta e permissões no banco
+Atualmente o usuário pode atualizar o próprio perfil, incluindo campos sensíveis como:
+account_type
+role
+status
+Uma pessoa com conhecimento técnico pode tentar se transformar em loja ou administrador diretamente pelo Supabase. Esses campos precisam ser alterados somente por funções seguras do banco ou por administradores.
+Restringir criação de lojas e produtos
+O banco deve confirmar que:
+O proprietário realmente possui uma conta de loja.
+A loja está aprovada.
+O produto pertence à loja do usuário conectado.
+Lojas suspensas não conseguem publicar.
+Não basta apenas esconder botões na interface.
+Melhorar a publicação comercial no Feed
+O produto já aparece no Feed, mas ainda seria melhor:
+Abrir diretamente a loja e o produto correto.
+Permitir conversar/comprar pelo próprio card.
+Adicionar “Patrocinado” ou “Oferta de loja”.
+Permitir denunciar uma oferta.
+Definir se produtos comerciais podem receber comentários e curtidas.
+Prioridade média
+Separar melhor contas de mãe e loja
+Uma loja ainda consegue acessar áreas e formulários pensados para mães. Vale definir claramente:
+O que mães podem fazer.
+O que lojas podem fazer.
+Quais páginas são públicas.
+Para onde cada tipo de conta vai depois do login.
+Melhorar mensagens de erro
+O sistema utiliza muitos alert(). Seria mais agradável usar notificações dentro da página:
+Sucesso ao publicar.
+Erro de conexão.
+Produto removido.
+Loja aguardando aprovação.
+Sessão expirada.
+Melhorar cadastro e recuperação de acesso
+Ainda faltam fluxos importantes:
+Esqueci minha senha.
+Reenvio de confirmação de e-mail.
+Alteração de e-mail e senha.
+Exclusão da conta.
+Termos de uso e política de privacidade.
+Moderação
+Para uma plataforma envolvendo mães e produtos infantis, recomendo:
+Bloquear usuários.
+Denunciar lojas e produtos.
+Suspender loja.
+Histórico das decisões administrativas.
+Motivo da remoção.
+Filtro contra spam e publicações repetidas.
+Parte técnica
+Criar testes automatizados
+O projeto não possui testes para regras críticas. Os primeiros deveriam verificar:
+Mãe não administra loja.
+Loja administra somente os próprios produtos.
+Usuário não consegue virar admin.
+Loja não aprovada não recebe selo.
+Produtos removidos desaparecem do Feed.
+Conversas só podem ser acessadas pelos participantes.
+Desempenho e organização
+O build já avisa que o JavaScript principal passou de 500 KB. Vale dividir as páginas por carregamento sob demanda, além de reduzir consultas repetidas e centralizar a sessão do usuário.
+Minha recomendação é começar por: proteção das permissões no Supabase → aprovação real de lojas → selo somente após aprovação → acesso direto ao produto pelo Feed. Essas quatro mudanças deixam a plataforma muito mais confiável.
