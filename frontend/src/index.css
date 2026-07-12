@@ -214,6 +214,24 @@ h3 {
   box-shadow: 0 10px 22px rgba(232, 79, 145, 0.28);
 }
 
+.account-avatar,
+.avatar,
+.comment-avatar,
+.profile-avatar-large,
+.profile-avatar-small {
+  overflow: hidden;
+}
+
+.account-avatar img,
+.avatar img,
+.comment-avatar img,
+.profile-avatar-large img,
+.profile-avatar-small img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .account-copy {
   display: grid;
   min-width: 0;
@@ -255,6 +273,7 @@ h3 {
 .feed-layout {
   grid-template-columns: minmax(0, 980px);
   justify-content: center;
+  padding-top: 18px;
 }
 
 .hero-panel {
@@ -403,6 +422,59 @@ select:focus {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.composer-price-row label {
+  display: grid;
+  gap: 8px;
+}
+
+.composer-price-row span {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.image-picker {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(232, 79, 145, 0.28);
+  border-radius: 999px;
+  padding: 10px 16px;
+  color: #fff;
+  background: rgba(232, 79, 145, 0.14);
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.image-picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.image-picker span {
+  overflow: hidden;
+  max-width: 250px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.post-like-count {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: #fff;
+  background: rgba(232, 79, 145, 0.18);
+  font-size: 0.9rem;
+  font-weight: 900;
 }
 
 .form-grid {
@@ -610,6 +682,38 @@ select:focus {
   line-height: 1.65;
 }
 
+.post-price {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: #fff;
+  background: linear-gradient(135deg, rgba(232, 79, 145, 0.8), rgba(185, 39, 102, 0.72));
+  font-size: 1rem;
+}
+
+.post-edit-form {
+  display: grid;
+  gap: 12px;
+}
+
+.post-edit-form textarea {
+  min-height: 96px;
+}
+
+.post-lock-note {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: rgba(255, 255, 255, 0.62);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
 .post-image,
 .product-media img {
   width: 100%;
@@ -662,59 +766,30 @@ select:focus {
 }
 
 .marketplace-feature-panel {
-  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
-  align-items: center;
+  padding: 14px;
 }
 
-.marketplace-feature-copy {
-  display: grid;
-  gap: 16px;
-}
-
-.marketplace-feature-copy h2,
 .marketplace-results h2 {
   color: #fff;
   font-size: clamp(1.45rem, 3vw, 2.4rem);
   line-height: 1.06;
 }
 
-.marketplace-tip-grid {
-  display: grid;
-  gap: 10px;
-}
-
-.marketplace-tip-grid span {
-  padding: 12px 13px;
-  border: 1px solid rgba(232, 79, 145, 0.18);
-  border-radius: 8px;
-  color: rgba(255, 255, 255, 0.76);
-  background: rgba(232, 79, 145, 0.1);
-  font-weight: 800;
-}
-
 .marketplace-highlight-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px;
 }
 
 .marketplace-highlight-card {
   position: relative;
-  display: grid;
-  align-content: end;
-  min-height: 210px;
+  display: block;
+  min-height: clamp(220px, 24vw, 320px);
   overflow: hidden;
-  padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   background: #111;
-}
-
-.marketplace-highlight-card::after {
-  position: absolute;
-  inset: 0;
-  content: "";
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.72));
+  box-shadow: 0 22px 42px rgba(0, 0, 0, 0.2);
 }
 
 .marketplace-highlight-card img {
@@ -725,29 +800,6 @@ select:focus {
   object-fit: cover;
 }
 
-.marketplace-highlight-card span,
-.marketplace-highlight-card strong {
-  position: relative;
-  z-index: 1;
-}
-
-.marketplace-highlight-card span {
-  width: fit-content;
-  margin-bottom: 8px;
-  padding: 7px 10px;
-  border-radius: 999px;
-  color: #fff;
-  background: rgba(232, 79, 145, 0.74);
-  font-size: 0.75rem;
-  font-weight: 950;
-}
-
-.marketplace-highlight-card strong {
-  color: #fff;
-  font-size: 1rem;
-  line-height: 1.2;
-}
-
 .announce-button {
   min-width: 140px;
 }
@@ -756,6 +808,57 @@ select:focus {
 .profile-form {
   position: sticky;
   top: 92px;
+}
+
+.profile-photo-editor {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(232, 79, 145, 0.22);
+  border-radius: 8px;
+  background: rgba(232, 79, 145, 0.08);
+}
+
+.profile-photo-preview {
+  display: grid;
+  width: 74px;
+  height: 74px;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid rgba(232, 79, 145, 0.42);
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(135deg, var(--rose-500), var(--rose-700));
+  box-shadow: 0 16px 30px rgba(232, 79, 145, 0.2);
+  font-size: 2rem;
+  font-weight: 950;
+}
+
+.profile-photo-editor > div:last-child {
+  min-width: 0;
+}
+
+.profile-photo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-photo-editor p {
+  margin: 6px 0 12px;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.profile-photo-editor .image-picker {
+  width: 100%;
+  max-width: 100%;
+  padding-inline: 12px;
+}
+
+.profile-photo-editor .image-picker span {
+  max-width: 100%;
 }
 
 .public-profile {
@@ -2138,6 +2241,7 @@ select:focus {
   .composer-top,
   .card-header,
   .form-grid,
+  .profile-photo-editor,
   .marketplace-feature-panel,
   .marketplace-highlight-grid,
   .store-front-card,

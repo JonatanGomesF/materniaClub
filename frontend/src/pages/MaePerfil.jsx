@@ -42,7 +42,7 @@ function MaePerfil() {
           .limit(6),
         supabase
           .from("posts")
-          .select("*, profiles(full_name, city, status)")
+          .select("*, profiles(full_name, city, status, avatar_url)")
           .eq("author_id", id)
           .eq("status", "published")
           .order("created_at", { ascending: false })
@@ -132,7 +132,9 @@ function MaePerfil() {
   return (
     <div className="page-shell public-profile">
       <section className="profile-hero-card">
-        <div className="profile-avatar-large">{profile.full_name?.charAt(0) || "M"}</div>
+        <div className="profile-avatar-large">
+          {profile.avatar_url ? <img src={profile.avatar_url} alt="" /> : profile.full_name?.charAt(0) || "M"}
+        </div>
         <div>
           <span className="eyebrow">Perfil da mae</span>
           <h1>{profile.full_name}</h1>

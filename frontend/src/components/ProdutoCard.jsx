@@ -8,6 +8,7 @@ function ProdutoCard({ currentUserId, interestLabel = "Tenho interesse", onDelet
     currency: "BRL",
   });
   const isOwner = currentUserId && produto.seller_id === currentUserId;
+  const likesCount = produto.likes_count || 0;
 
   function getDistanceLabel() {
     if (!userLocation || !produto.latitude || !produto.longitude) return null;
@@ -57,7 +58,7 @@ function ProdutoCard({ currentUserId, interestLabel = "Tenho interesse", onDelet
 
         <div className="market-meta">
           {distanceLabel && <span>{distanceLabel}</span>}
-          <span>{produto.likes_count || 0} curtidas</span>
+          <span>{likesCount} {likesCount === 1 ? "curtida" : "curtidas"}</span>
         </div>
 
         <p className="seller-line">Publicado por {produto.profiles?.full_name || produto.nome || "uma usuaria"}</p>
@@ -69,7 +70,7 @@ function ProdutoCard({ currentUserId, interestLabel = "Tenho interesse", onDelet
                 event.stopPropagation();
                 onLike(produto);
               }}>
-                Curtir
+                {produto.liked_by_me ? "Curtiu" : "Curtir"}
               </button>
             )}
             {!isOwner && onInterest && <button className="primary-button" onClick={(event) => {

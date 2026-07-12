@@ -8,21 +8,27 @@ function Navbar() {
 
   useEffect(() => {
     let mounted = true;
+    const refreshAccount = () => {
+      getCurrentSession().then(({ session, profile }) => {
+        if (mounted) setAccount(getDisplayUser(session, profile));
+      });
+    };
 
-    getCurrentSession().then(({ session, profile }) => {
-      if (mounted) setAccount(getDisplayUser(session, profile));
-    });
+    refreshAccount();
+    window.addEventListener("maternia-profile-updated", refreshAccount);
 
     if (!supabase) return () => {
       mounted = false;
+      window.removeEventListener("maternia-profile-updated", refreshAccount);
     };
 
     const { data } = supabase.auth.onAuthStateChange(() => {
-      getCurrentSession().then(({ session, profile }) => setAccount(getDisplayUser(session, profile)));
+      refreshAccount();
     });
 
     return () => {
       mounted = false;
+      window.removeEventListener("maternia-profile-updated", refreshAccount);
       data.subscription.unsubscribe();
     };
   }, []);
@@ -90,7 +96,9 @@ function Navbar() {
         {!isSupabaseConfigured && <span className="status-pill">Demo</span>}
         {account ? (
           <div className="account-card">
-            <span className="account-avatar">{account.initial}</span>
+            <span className="account-avatar">
+              {account.avatarUrl ? <img src={account.avatarUrl} alt="" /> : account.initial}
+            </span>
             <span className="account-copy">
               <strong>Ola, {account.firstName}</strong>
               <small>{account.email}</small>

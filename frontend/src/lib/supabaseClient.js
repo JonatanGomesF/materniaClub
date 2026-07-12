@@ -39,6 +39,7 @@ export function getDisplayUser(session, profile) {
     fullName,
     firstName: fullName.split(" ")[0],
     initial: fullName.trim().charAt(0).toUpperCase(),
+    avatarUrl: profile?.avatar_url || null,
     role: profile?.role || "user",
     status: profile?.status || "active",
   };

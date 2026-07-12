@@ -4,42 +4,26 @@ import { demoProducts } from "../data/demoData";
 import { ensureUserProfile, getCurrentSession, isSupabaseConfigured, supabase, uploadMedia } from "../lib/supabaseClient";
 
 const marketplaceHighlights = [
-  ...demoProducts,
   {
-    id: "highlight-fraldas",
-    title: "Promocoes de fraldas",
-    condition: "ofertas",
-    category: "fraldas",
-    city: "perto de voce",
-    image_url: "https://images.unsplash.com/photo-1546015720-b8b30df5aa27?auto=format&fit=crop&w=900&q=80",
-    profiles: { full_name: "materniaClub" },
+    id: "baby-diaper",
+    title: "Bebe lindo usando fralda",
+    image_url: "https://images.unsplash.com/photo-1546015720-b8b30df5aa27?auto=format&fit=crop&w=1200&q=90",
   },
   {
-    id: "highlight-roupinhas",
-    title: "Roupinhas e enxoval",
-    condition: "achadinhos",
-    category: "roupinhas",
-    city: "para o bebe",
-    image_url: "https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&w=900&q=80",
-    profiles: { full_name: "materniaClub" },
+    id: "mother-child",
+    title: "Mae com crianca no colo",
+    image_url: "https://images.unsplash.com/photo-1492725764893-90b379c2b6e7?auto=format&fit=crop&w=1200&q=90",
   },
   {
-    id: "highlight-quarto",
-    title: "Itens para o quartinho",
-    condition: "decoracao",
-    category: "quarto",
-    city: "mamaes",
-    image_url: "https://images.unsplash.com/photo-1492725764893-90b379c2b6e7?auto=format&fit=crop&w=900&q=80",
-    profiles: { full_name: "materniaClub" },
+    id: "baby-items",
+    title: "Mamadeira, chupeta e brinquedos",
+    image_url: "https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&w=1200&q=90",
   },
 ];
 
-const marketplaceTips = [
-  "Fraldas, chupetas e mamadeiras com preco bom",
-  "Carrinhos e bebe conforto seminovos",
-  "Produtos perto da sua localizacao",
-  "Chat direto com a mae ou loja anunciante",
-];
+function isMissingProductLikesTable(error) {
+  return error?.code === "42P01" || error?.code === "PGRST205" || error?.message?.includes("product_likes");
+}
 
 function Marketplace() {
   const [products, setProducts] = useState(isSupabaseConfigured ? [] : demoProducts);
@@ -107,10 +91,15 @@ function Marketplace() {
       return;
     }
 
-    const { data: likes } = await supabase
+    const { data: likes, error: likesError } = await supabase
       .from("product_likes")
       .select("product_id,user_id")
       .in("product_id", ids);
+
+    if (likesError && !isMissingProductLikesTable(likesError)) {
+      setFetchingProducts(false);
+      return;
+    }
 
     const enriched = data.map((product) => {
       const productLikes = likes?.filter((like) => like.product_id === product.id) || [];
@@ -135,6 +124,21 @@ function Marketplace() {
       requestLocation().catch(() => {});
     }
   }, [fetchProducts, requestLocation, userLocation]);
+
+  useEffect(() => {
+    if (!supabase) return undefined;
+
+    const channel = supabase
+      .channel("marketplace-product-likes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "product_likes" }, () => {
+        fetchProducts();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchProducts]);
 
   function updateField(event) {
     setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
@@ -188,13 +192,25 @@ function Marketplace() {
         .delete()
         .eq("product_id", product.id)
         .eq("user_id", session.user.id);
-      if (error) return alert(error.message);
+      if (error) {
+        if (isMissingProductLikesTable(error)) {
+          alert("As curtidas ainda precisam ser ativadas no Supabase. Rode o SQL marketplace-social-update.sql.");
+          return;
+        }
+        return alert(error.message);
+      }
     } else {
       const { error } = await supabase.from("product_likes").insert({
         product_id: product.id,
         user_id: session.user.id,
       });
-      if (error) return alert(error.message);
+      if (error) {
+        if (isMissingProductLikesTable(error)) {
+          alert("As curtidas ainda precisam ser ativadas no Supabase. Rode o SQL marketplace-social-update.sql.");
+          return;
+        }
+        return alert(error.message);
+      }
     }
 
     setProducts((current) => current.map((item) => {
@@ -311,19 +327,10 @@ function Marketplace() {
       </section>
 
       <section className="marketplace-feature-panel">
-        <div className="marketplace-feature-copy">
-          <span className="eyebrow">Universo do bebe</span>
-          <h2>Fotos, categorias e ideias para encontrar o que sua familia precisa.</h2>
-          <div className="marketplace-tip-grid">
-            {marketplaceTips.map((tip) => <span key={tip}>{tip}</span>)}
-          </div>
-        </div>
         <div className="marketplace-highlight-grid">
-          {marketplaceHighlights.slice(0, 6).map((item) => (
+          {marketplaceHighlights.map((item) => (
             <article className="marketplace-highlight-card" key={item.id}>
               <img src={item.image_url} alt={item.title} />
-              <span>{item.category}</span>
-              <strong>{item.title}</strong>
             </article>
           ))}
         </div>
