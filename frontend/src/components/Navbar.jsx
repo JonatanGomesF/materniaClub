@@ -4,6 +4,7 @@ import { getCurrentSession, getDisplayUser, isSupabaseConfigured, supabase } fro
 
 function Navbar() {
   const [account, setAccount] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -26,6 +27,36 @@ function Navbar() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!supabase || !account?.id) {
+      return undefined;
+    }
+
+    let mounted = true;
+
+    const loadUnreadCount = async () => {
+      const { count, error } = await supabase
+        .from("messages")
+        .select("id", { count: "exact", head: true })
+        .neq("sender_id", account.id)
+        .is("read_at", null);
+
+      if (mounted && !error) setUnreadCount(count || 0);
+    };
+
+    loadUnreadCount();
+
+    const channel = supabase
+      .channel(`navbar-unread-${account.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, loadUnreadCount)
+      .subscribe();
+
+    return () => {
+      mounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [account?.id]);
+
   const logout = async () => {
     if (supabase) await supabase.auth.signOut();
     window.location.href = "/login";
@@ -44,7 +75,11 @@ function Navbar() {
         <NavLink to="/">Feed</NavLink>
         <NavLink to="/marketplace">Marketplace</NavLink>
         <NavLink to="/lojas">Lojas</NavLink>
-        <NavLink to="/chat">Chat</NavLink>
+        <NavLink to="/amigos">Amigos</NavLink>
+        <NavLink className="chat-nav-link" to="/chat">
+          Chat
+          {account && unreadCount > 0 && <span className="unread-badge" aria-label={`${unreadCount} mensagens nao lidas`}>{unreadCount}</span>}
+        </NavLink>
         <NavLink to="/perfil">Perfil</NavLink>
         {["admin", "moderator"].includes(account?.role) && <NavLink to="/admin">Admin</NavLink>}
       </nav>

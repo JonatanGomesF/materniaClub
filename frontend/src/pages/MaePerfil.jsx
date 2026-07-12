@@ -11,6 +11,7 @@ function MaePerfil() {
   const [stats, setStats] = useState({ posts: 0, activeProducts: 0, soldProducts: 0 });
   const [products, setProducts] = useState([]);
   const [posts, setPosts] = useState([]);
+  const [friendship, setFriendship] = useState(null);
   const [loadedAt] = useState(() => Date.now());
 
   useEffect(() => {
@@ -56,6 +57,15 @@ function MaePerfil() {
       });
       setProducts(productRows || []);
       setPosts(postRows || []);
+
+      if (currentSession?.user && currentSession.user.id !== id) {
+        const { data: friendshipData } = await supabase
+          .from("friendships")
+          .select("*")
+          .or(`and(requester_id.eq.${currentSession.user.id},addressee_id.eq.${id}),and(requester_id.eq.${id},addressee_id.eq.${currentSession.user.id})`)
+          .maybeSingle();
+        setFriendship(friendshipData);
+      }
     }
 
     loadProfile();
@@ -76,6 +86,36 @@ function MaePerfil() {
     return `${years} ${years === 1 ? "ano" : "anos"}`;
   }
 
+  async function sendFriendRequest() {
+    if (!supabase || !session?.user) return alert("Faca login para enviar uma solicitacao de amizade.");
+    const { data, error } = await supabase.from("friendships").insert({ requester_id: session.user.id, addressee_id: id }).select().single();
+    if (error) return alert(error.code === "23505" ? "Ja existe uma solicitacao entre voces." : error.message);
+    setFriendship(data);
+  }
+
+  async function acceptFriendRequest() {
+    const { data, error } = await supabase.from("friendships").update({ status: "accepted", updated_at: new Date().toISOString() }).eq("id", friendship.id).select().single();
+    if (error) return alert(error.message);
+    setFriendship(data);
+  }
+
+  async function removeFriendship() {
+    if (!window.confirm(friendship?.status === "accepted" ? "Desfazer esta amizade?" : "Cancelar esta solicitacao?")) return;
+    const { error } = await supabase.from("friendships").delete().eq("id", friendship.id);
+    if (error) return alert(error.message);
+    setFriendship(null);
+  }
+
+  function renderFriendshipAction() {
+    if (!session?.user || session.user.id === id) return null;
+    if (!friendship) return <button className="primary-button" onClick={sendFriendRequest}>Adicionar amiga</button>;
+    if (friendship.status === "accepted") return <button className="soft-button" onClick={removeFriendship}>Amigas ✓</button>;
+    if (friendship.addressee_id === session.user.id) {
+      return <div className="friend-actions"><button className="primary-button" onClick={acceptFriendRequest}>Aceitar amizade</button><button className="soft-button" onClick={removeFriendship}>Recusar</button></div>;
+    }
+    return <button className="soft-button" onClick={removeFriendship}>Solicitacao enviada</button>;
+  }
+
   if (!profile) {
     return (
       <div className="page-shell">
@@ -92,6 +132,7 @@ function MaePerfil() {
           <span className="eyebrow">Perfil da mae</span>
           <h1>{profile.full_name}</h1>
           <p>{profile.bio || "Mae da comunidade materniaClub compartilhando ofertas, desapegos e experiencias."}</p>
+          {renderFriendshipAction()}
         </div>
       </section>
 
@@ -141,7 +182,7 @@ function MaePerfil() {
           <p className="empty-state">Nenhuma publicacao recente.</p>
         ) : (
           <div className="profile-post-list">
-            {posts.map((post) => <PostCard key={post.id} post={post} />)}
+            {posts.map((post) => <PostCard currentUserId={session?.user?.id} key={post.id} post={post} />)}
           </div>
         )}
       </section>

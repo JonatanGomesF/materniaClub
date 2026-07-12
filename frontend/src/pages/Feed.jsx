@@ -117,7 +117,7 @@ function Feed() {
         </form>
 
         {posts.map((post) => (
-          <PostCard key={post.id} post={post} onReport={reportPost} />
+          <PostCard currentUserId={session?.user?.id} key={post.id} post={post} onReport={reportPost} />
         ))}
       </section>
     </div>

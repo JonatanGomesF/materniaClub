@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
 import Admin from "./pages/Admin";
+import Amigos from "./pages/Amigos";
 import Chat from "./pages/Chat";
 import Feed from "./pages/Feed";
 import Login from "./pages/Login";
@@ -23,6 +24,7 @@ function App() {
           <Route path="/chat" element={<Chat />} />
           <Route path="/login" element={<Login />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/amigos" element={<Amigos />} />
           <Route path="/maes/:id" element={<MaePerfil />} />
         </Routes>
       </main>

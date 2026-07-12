@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getCurrentSession, supabase } from "../lib/supabaseClient";
 
@@ -9,6 +9,7 @@ function Chat() {
   const [activeConversation, setActiveConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState("");
+  const [unreadByConversation, setUnreadByConversation] = useState({});
 
   function getConversationProduct(conversation) {
     return conversation?.products || conversation?.store_products || null;
@@ -19,7 +20,40 @@ function Chat() {
     return product?.title || "Conversa do marketplace";
   }
 
-  async function loadMessages(conversationId) {
+  const markConversationAsRead = useCallback(async (conversationId, userId) => {
+    if (!supabase || !conversationId || !userId) return;
+
+    await supabase
+      .from("messages")
+      .update({ read_at: new Date().toISOString() })
+      .eq("conversation_id", conversationId)
+      .neq("sender_id", userId)
+      .is("read_at", null);
+
+    setUnreadByConversation((current) => ({ ...current, [conversationId]: 0 }));
+  }, []);
+
+  const loadUnreadCounts = useCallback(async (userId, conversationRows) => {
+    if (!supabase || !userId || conversationRows.length === 0) {
+      setUnreadByConversation({});
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("messages")
+      .select("conversation_id")
+      .in("conversation_id", conversationRows.map((item) => item.id))
+      .neq("sender_id", userId)
+      .is("read_at", null);
+
+    if (error) return;
+    setUnreadByConversation((data || []).reduce((counts, item) => {
+      counts[item.conversation_id] = (counts[item.conversation_id] || 0) + 1;
+      return counts;
+    }, {}));
+  }, []);
+
+  const loadMessages = useCallback(async (conversationId, userId) => {
     if (!supabase || !conversationId) return;
 
     const { data, error } = await supabase
@@ -28,8 +62,11 @@ function Chat() {
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true });
 
-    if (!error) setMessages(data || []);
-  }
+    if (!error) {
+      setMessages(data || []);
+      await markConversationAsRead(conversationId, userId);
+    }
+  }, [markConversationAsRead]);
 
   useEffect(() => {
     async function loadChat() {
@@ -58,15 +95,31 @@ function Chat() {
 
       const rows = data || [];
       setConversations(rows);
+      loadUnreadCounts(currentSession.user.id, rows);
 
       const conversationId = searchParams.get("conversation");
       const selected = rows.find((item) => item.id === conversationId) || rows[0] || null;
       setActiveConversation(selected);
-      if (selected) loadMessages(selected.id);
+      if (selected) loadMessages(selected.id, currentSession.user.id);
     }
 
     loadChat();
-  }, [searchParams]);
+  }, [loadMessages, loadUnreadCounts, searchParams]);
+
+  useEffect(() => {
+    if (!supabase || !session?.user) return undefined;
+
+    const activeConversationId = activeConversation?.id;
+    const channel = supabase
+      .channel(`chat-messages-${session.user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => {
+        loadUnreadCounts(session.user.id, conversations);
+        if (activeConversationId) loadMessages(activeConversationId, session.user.id);
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [session?.user, conversations, activeConversation?.id, loadMessages, loadUnreadCounts]);
 
   async function sendMessage(event) {
     event.preventDefault();
@@ -108,7 +161,10 @@ function Chat() {
                 loadMessages(conversation.id);
               }}
             >
-              {getConversationTitle(conversation)}
+              <span>{getConversationTitle(conversation)}</span>
+              {unreadByConversation[conversation.id] > 0 && (
+                <span className="conversation-unread">{unreadByConversation[conversation.id]}</span>
+              )}
             </button>
           ))}
         </aside>
