@@ -40,6 +40,7 @@ export function getDisplayUser(session, profile) {
     firstName: fullName.split(" ")[0],
     initial: fullName.trim().charAt(0).toUpperCase(),
     avatarUrl: profile?.avatar_url || null,
+    accountType: profile?.account_type || "user",
     role: profile?.role || "user",
     status: profile?.status || "active",
   };
@@ -58,6 +59,7 @@ export async function ensureUserProfile(user, fallback = {}) {
         full_name: fullName,
         city: fallback.city || null,
         motherhood_stage: fallback.motherhood_stage || "gestante",
+        account_type: fallback.account_type || "user",
         role: fallback.role || "user",
         status: "active",
       },

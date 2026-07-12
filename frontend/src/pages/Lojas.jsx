@@ -8,6 +8,17 @@ const emptyStore = {
   cnpj: "",
   city: "",
   description: "",
+  logo_url: "",
+  cover_url: "",
+};
+
+const emptyStoreAccess = {
+  email: "",
+  password: "",
+  name: "",
+  cnpj: "",
+  city: "",
+  description: "",
 };
 
 const emptyProduct = {
@@ -20,6 +31,7 @@ const emptyProduct = {
 
 function Lojas() {
   const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [stores, setStores] = useState([]);
   const [store, setStore] = useState(null);
   const [storeProducts, setStoreProducts] = useState([]);
@@ -27,12 +39,15 @@ function Lojas() {
   const [selectedStore, setSelectedStore] = useState(null);
   const [activeView, setActiveView] = useState("showcase");
   const [storeForm, setStoreForm] = useState(emptyStore);
+  const [storeAccess, setStoreAccess] = useState(emptyStoreAccess);
   const [productForm, setProductForm] = useState(emptyProduct);
   const [editingProduct, setEditingProduct] = useState(null);
   const [file, setFile] = useState(null);
+  const [logoFile, setLogoFile] = useState(null);
+  const [coverFile, setCoverFile] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const loadStores = useCallback(async (currentSession = session) => {
+  const loadStores = useCallback(async (currentSession = session, currentProfile = profile) => {
     if (!supabase) return;
 
     const { data: storeRows } = await supabase
@@ -51,7 +66,7 @@ function Lojas() {
 
     setStoreProducts(productRows || []);
 
-    if (!currentSession?.user) {
+    if (!currentSession?.user || currentProfile?.account_type !== "store") {
       setStore(null);
       setMyProducts([]);
       return;
@@ -71,6 +86,8 @@ function Lojas() {
         cnpj: myStore.cnpj || "",
         city: myStore.city || "",
         description: myStore.description || "",
+        logo_url: myStore.logo_url || "",
+        cover_url: myStore.cover_url || "",
       });
 
       const { data: mine } = await supabase
@@ -81,13 +98,14 @@ function Lojas() {
 
       setMyProducts(mine || []);
     }
-  }, [session]);
+  }, [profile, session]);
 
   useEffect(() => {
     async function load() {
-      const { session: currentSession } = await getCurrentSession();
+      const { session: currentSession, profile: currentProfile } = await getCurrentSession();
       setSession(currentSession);
-      loadStores(currentSession);
+      setProfile(currentProfile);
+      loadStores(currentSession, currentProfile);
     }
 
     load();
@@ -97,6 +115,10 @@ function Lojas() {
     setStoreForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   }
 
+  function updateStoreAccess(event) {
+    setStoreAccess((current) => ({ ...current, [event.target.name]: event.target.value }));
+  }
+
   function updateProductForm(event) {
     setProductForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   }
@@ -104,11 +126,14 @@ function Lojas() {
   async function saveStore(event) {
     event.preventDefault();
     if (!supabase || !session?.user) return alert("Entre no app para cadastrar sua loja.");
+    if (profile?.account_type !== "store") return alert("Esta area e exclusiva para contas de loja.");
     if (!storeForm.name.trim() || !storeForm.cnpj.trim()) return alert("Informe nome da loja e CNPJ.");
 
     setSaving(true);
     try {
-      await ensureUserProfile(session.user);
+      await ensureUserProfile(session.user, { account_type: "store", full_name: storeForm.name.trim(), city: storeForm.city.trim() });
+      const logoUrl = logoFile ? await uploadMedia(logoFile, "store-logos") : storeForm.logo_url || null;
+      const coverUrl = coverFile ? await uploadMedia(coverFile, "store-covers") : storeForm.cover_url || null;
 
       const payload = {
         owner_id: session.user.id,
@@ -116,15 +141,68 @@ function Lojas() {
         cnpj: storeForm.cnpj.trim(),
         city: storeForm.city.trim(),
         description: storeForm.description.trim(),
+        logo_url: logoUrl,
       };
+
+      if (coverUrl) payload.cover_url = coverUrl;
 
       const { error } = store
         ? await supabase.from("stores").update(payload).eq("id", store.id)
         : await supabase.from("stores").insert(payload);
 
       if (error) throw error;
-      await loadStores(session);
+      setLogoFile(null);
+      setCoverFile(null);
+      await loadStores(session, { ...profile, account_type: "store" });
       setActiveView("manage");
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function registerStoreAccount(event) {
+    event.preventDefault();
+    if (!supabase) return alert("Conecte o Supabase para cadastrar lojas.");
+    if (!storeAccess.email || !storeAccess.password || !storeAccess.name || !storeAccess.cnpj) {
+      return alert("Informe email, senha, nome da loja e CNPJ.");
+    }
+
+    setSaving(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: storeAccess.email,
+        password: storeAccess.password,
+        options: { data: { full_name: storeAccess.name, account_type: "store" } },
+      });
+
+      if (error) throw error;
+
+      if (!data.session?.user) {
+        alert("Conta da loja criada. Confirme o email e depois entre novamente em Minha loja.");
+        return;
+      }
+
+      const storeProfile = await ensureUserProfile(data.session.user, {
+        full_name: storeAccess.name,
+        city: storeAccess.city,
+        account_type: "store",
+      });
+
+      const { error: storeError } = await supabase.from("stores").insert({
+        owner_id: data.session.user.id,
+        name: storeAccess.name.trim(),
+        cnpj: storeAccess.cnpj.trim(),
+        city: storeAccess.city.trim(),
+        description: storeAccess.description.trim(),
+      });
+
+      if (storeError) throw storeError;
+      setSession(data.session);
+      setProfile(storeProfile);
+      setStoreAccess(emptyStoreAccess);
+      await loadStores(data.session, storeProfile);
     } catch (error) {
       alert(error.message);
     } finally {
@@ -351,14 +429,41 @@ function Lojas() {
           <section className="store-admin-panel">
           {!session ? (
             <div className="store-empty-admin">
-              <h2>Entre para administrar uma loja</h2>
-              <p>Use seu usuario normal do materniaClub. Depois de entrar, voce cadastra os dados da loja e publica produtos.</p>
-              <Link className="primary-button" to="/login">Entrar no app</Link>
+              <h2>Acesso exclusivo para lojas</h2>
+              <p>Maes usam Feed, Marketplace e Vitrine. Lojas usam esta area para cadastrar a vitrine e anunciar produtos infantis.</p>
+              <form className="store-access-form" onSubmit={registerStoreAccount}>
+                <input name="name" placeholder="Nome da loja" value={storeAccess.name} onChange={updateStoreAccess} />
+                <input name="cnpj" placeholder="CNPJ" value={storeAccess.cnpj} onChange={updateStoreAccess} />
+                <input name="city" placeholder="Cidade da loja" value={storeAccess.city} onChange={updateStoreAccess} />
+                <input name="email" type="email" placeholder="Email da loja" value={storeAccess.email} onChange={updateStoreAccess} />
+                <input name="password" type="password" placeholder="Senha" value={storeAccess.password} onChange={updateStoreAccess} />
+                <textarea name="description" placeholder="Descricao curta da loja" value={storeAccess.description} onChange={updateStoreAccess} />
+                <button className="primary-button" disabled={saving}>{saving ? "Criando..." : "Cadastrar loja"}</button>
+              </form>
+              <Link className="ghost-button" to="/login">Ja tenho acesso de loja</Link>
+            </div>
+          ) : profile?.account_type !== "store" ? (
+            <div className="store-empty-admin">
+              <h2>Esta conta e de mae</h2>
+              <p>Para manter a plataforma organizada, maes compram, conversam e encontram ofertas. Apenas contas de loja podem administrar vitrines e produtos.</p>
+              <p className="hint">Saia desta conta e entre com o email da loja para acessar o painel de produtos.</p>
             </div>
           ) : (
             <>
               <form className="listing-form" onSubmit={saveStore}>
                 <h2>{store ? "Dados da loja" : "Cadastrar minha loja"}</h2>
+                <div className="store-media-editor">
+                  <div className="store-logo-preview">{storeForm.logo_url ? <img src={storeForm.logo_url} alt="" /> : <span>{storeForm.name?.charAt(0) || "L"}</span>}</div>
+                  <label className="image-picker">
+                    <input type="file" accept="image/*" onChange={(event) => setLogoFile(event.target.files?.[0] || null)} />
+                    <span>{logoFile ? logoFile.name : "Alterar logo da loja"}</span>
+                  </label>
+                  <div className="store-cover-preview">{storeForm.cover_url ? <img src={storeForm.cover_url} alt="" /> : <span>Foto de capa</span>}</div>
+                  <label className="image-picker">
+                    <input type="file" accept="image/*" onChange={(event) => setCoverFile(event.target.files?.[0] || null)} />
+                    <span>{coverFile ? coverFile.name : "Alterar foto da vitrine"}</span>
+                  </label>
+                </div>
                 <input name="name" placeholder="Nome da loja" value={storeForm.name} onChange={updateStoreForm} />
                 <input name="cnpj" placeholder="CNPJ" value={storeForm.cnpj} onChange={updateStoreForm} />
                 <input name="city" placeholder="Cidade da loja" value={storeForm.city} onChange={updateStoreForm} />
@@ -447,6 +552,11 @@ function Lojas() {
                     const productCount = getStoreProductCount(storeItem);
                     return (
                       <button className="store-front-card" key={storeItem.id} onClick={() => setSelectedStore(storeItem)}>
+                        {storeItem.cover_url && (
+                          <div className="store-front-cover">
+                            <img src={storeItem.cover_url} alt="" />
+                          </div>
+                        )}
                         <div className="store-front-logo">
                           {storeItem.logo_url ? <img src={storeItem.logo_url} alt={storeItem.name} /> : <span>{storeItem.name?.charAt(0) || "L"}</span>}
                         </div>
