@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import ProductComments from "./ProductComments";
 
 function ProdutoCard({ currentUserId, interestLabel = "Tenho interesse", onDelete, onInterest, onLike, onReport, produto, profilePath, userLocation }) {
   const navigate = useNavigate();
@@ -85,6 +86,7 @@ function ProdutoCard({ currentUserId, interestLabel = "Tenho interesse", onDelet
             }}>Denunciar</button>}
           </div>
         )}
+        <ProductComments currentUserId={currentUserId} product={produto} />
       </div>
     </article>
   );

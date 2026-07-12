@@ -1,15 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 
 function PostCard({ post, onReport, currentUserId }) {
   const navigate = useNavigate();
-  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(true);
   const [comments, setComments] = useState([]);
   const [commentBody, setCommentBody] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [editingBody, setEditingBody] = useState("");
-  const [loadingComments, setLoadingComments] = useState(false);
+  const [loadingComments, setLoadingComments] = useState(true);
   const author = post.profiles?.full_name || "Mae da comunidade";
   const city = post.profiles?.city || "materniaClub";
   const date = post.created_at
@@ -28,6 +28,26 @@ function PostCard({ post, onReport, currentUserId }) {
     else setComments(data || []);
     setLoadingComments(false);
   }
+
+  useEffect(() => {
+    if (!supabase || !post.id) return;
+    let active = true;
+    supabase
+      .from("comments")
+      .select("*, profiles(full_name, avatar_url)")
+      .eq("post_id", post.id)
+      .eq("status", "published")
+      .order("created_at", { ascending: true })
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (!error) setComments(data || []);
+        setLoadingComments(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [post.id]);
 
   async function toggleComments(event) {
     event.stopPropagation();
@@ -85,7 +105,7 @@ function PostCard({ post, onReport, currentUserId }) {
 
       <div className="card-actions">
         <button className="soft-button" onClick={(event) => event.stopPropagation()}>Curtir</button>
-        <button className="soft-button" onClick={toggleComments}>Comentar</button>
+        <button className="soft-button" onClick={toggleComments}>{commentsOpen ? "Ocultar comentarios" : "Ver comentarios"}</button>
         <button className="ghost-button" onClick={(event) => {
           event.stopPropagation();
           onReport?.(post);

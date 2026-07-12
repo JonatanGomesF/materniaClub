@@ -4,6 +4,7 @@
 
 drop table if exists public.messages cascade;
 drop table if exists public.conversations cascade;
+drop table if exists public.friendships cascade;
 drop table if exists public.store_products cascade;
 drop table if exists public.stores cascade;
 drop table if exists public.product_images cascade;
@@ -30,6 +31,20 @@ create table public.profiles (
   status text not null default 'active' check (status in ('active', 'suspended', 'banned')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+create table public.friendships (
+  id uuid primary key default gen_random_uuid(),
+  requester_id uuid not null references public.profiles(id) on delete cascade,
+  addressee_id uuid not null references public.profiles(id) on delete cascade,
+  status text not null default 'pending' check (status in ('pending', 'accepted')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (requester_id <> addressee_id)
+);
+
+create unique index friendships_pair_unique on public.friendships (
+  least(requester_id, addressee_id), greatest(requester_id, addressee_id)
 );
 
 create table public.categories (
@@ -99,7 +114,9 @@ create table public.store_products (
 create table public.likes (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
-  post_id uuid not null references public.posts(id) on delete cascade,
+  post_id uuid references public.posts(id) on delete cascade,
+  product_id uuid references public.products(id) on delete cascade,
+  store_product_id uuid references public.store_products(id) on delete cascade,
   created_at timestamptz not null default now(),
   unique (user_id, post_id)
 );
@@ -118,7 +135,8 @@ create table public.comments (
   post_id uuid not null references public.posts(id) on delete cascade,
   body text not null,
   status text not null default 'published' check (status in ('published', 'hidden', 'removed')),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  check (num_nonnulls(post_id, product_id, store_product_id) = 1)
 );
 
 create table public.reports (
@@ -210,10 +228,16 @@ alter table public.comments enable row level security;
 alter table public.reports enable row level security;
 alter table public.conversations enable row level security;
 alter table public.messages enable row level security;
+alter table public.friendships enable row level security;
 
 create policy "profiles public read" on public.profiles for select using (status <> 'banned' or public.is_admin());
 create policy "profiles owner insert" on public.profiles for insert with check (auth.uid() = id);
 create policy "profiles owner update" on public.profiles for update using (auth.uid() = id or public.is_admin()) with check (auth.uid() = id or public.is_admin());
+
+create policy "friendships participants read" on public.friendships for select using (auth.uid() in (requester_id, addressee_id));
+create policy "friendships requester insert" on public.friendships for insert with check (auth.uid() = requester_id and status = 'pending');
+create policy "friendships addressee accept" on public.friendships for update using (auth.uid() = addressee_id and status = 'pending') with check (auth.uid() = addressee_id and status = 'accepted');
+create policy "friendships participants delete" on public.friendships for delete using (auth.uid() in (requester_id, addressee_id));
 
 create policy "categories public read" on public.categories for select using (true);
 create policy "categories admin write" on public.categories for all using (public.is_admin()) with check (public.is_admin());
@@ -264,6 +288,7 @@ create policy "product likes owner delete" on public.product_likes for delete us
 create policy "comments public read" on public.comments for select using (status = 'published' or user_id = auth.uid() or public.is_admin());
 create policy "comments owner insert" on public.comments for insert with check (auth.uid() = user_id);
 create policy "comments owner update" on public.comments for update using (user_id = auth.uid() or public.is_admin()) with check (user_id = auth.uid() or public.is_admin());
+create policy "comments owner delete" on public.comments for delete using (user_id = auth.uid() or public.is_admin());
 
 create policy "reports owner insert" on public.reports for insert with check (auth.uid() = reporter_id);
 create policy "reports admin read" on public.reports for select using (public.is_admin() or auth.uid() = reporter_id);
@@ -280,6 +305,21 @@ create policy "messages participants read" on public.messages for select using (
   ) or public.is_admin()
 );
 create policy "messages sender insert" on public.messages for insert with check (auth.uid() = sender_id);
+create policy "messages recipient mark read" on public.messages for update using (
+  sender_id <> auth.uid()
+  and exists (
+    select 1 from public.conversations c
+    where c.id = conversation_id
+    and auth.uid() in (c.buyer_id, c.seller_id)
+  )
+) with check (
+  sender_id <> auth.uid()
+  and exists (
+    select 1 from public.conversations c
+    where c.id = conversation_id
+    and auth.uid() in (c.buyer_id, c.seller_id)
+  )
+);
 
 insert into storage.buckets (id, name, public)
 values ('maternia-media', 'maternia-media', true)

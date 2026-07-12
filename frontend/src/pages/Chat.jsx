@@ -23,14 +23,17 @@ function Chat() {
   const markConversationAsRead = useCallback(async (conversationId, userId) => {
     if (!supabase || !conversationId || !userId) return;
 
-    await supabase
+    const { error } = await supabase
       .from("messages")
       .update({ read_at: new Date().toISOString() })
       .eq("conversation_id", conversationId)
       .neq("sender_id", userId)
       .is("read_at", null);
 
-    setUnreadByConversation((current) => ({ ...current, [conversationId]: 0 }));
+    if (!error) {
+      setUnreadByConversation((current) => ({ ...current, [conversationId]: 0 }));
+      window.dispatchEvent(new Event("chat-unread-changed"));
+    }
   }, []);
 
   const loadUnreadCounts = useCallback(async (userId, conversationRows) => {

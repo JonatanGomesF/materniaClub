@@ -45,6 +45,7 @@ function Navbar() {
     };
 
     loadUnreadCount();
+    window.addEventListener("chat-unread-changed", loadUnreadCount);
 
     const channel = supabase
       .channel(`navbar-unread-${account.id}`)
@@ -53,6 +54,7 @@ function Navbar() {
 
     return () => {
       mounted = false;
+      window.removeEventListener("chat-unread-changed", loadUnreadCount);
       supabase.removeChannel(channel);
     };
   }, [account?.id]);

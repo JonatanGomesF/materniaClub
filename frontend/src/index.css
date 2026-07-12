@@ -486,6 +486,14 @@ select:focus {
   padding-top: 14px;
 }
 
+.product-comments {
+  margin-top: 12px;
+}
+
+.product-comments > .soft-button {
+  width: 100%;
+}
+
 .comments-panel h4 {
   margin: 0 0 12px;
 }
@@ -1362,7 +1370,7 @@ select:focus {
 
 .product-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 300px));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 420px));
   justify-content: center;
   gap: 22px;
   width: min(1060px, 100%);
