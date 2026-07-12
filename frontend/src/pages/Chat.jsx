@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { getCurrentSession, supabase } from "../lib/supabaseClient";
 
 function Chat() {
@@ -18,6 +18,11 @@ function Chat() {
   function getConversationTitle(conversation) {
     const product = getConversationProduct(conversation);
     return product?.title || "Conversa do marketplace";
+  }
+
+  function getOtherParticipant(conversation) {
+    if (!conversation || !session?.user) return null;
+    return conversation.buyer_id === session.user.id ? conversation.seller : conversation.buyer;
   }
 
   const markConversationAsRead = useCallback(async (conversationId, userId) => {
@@ -79,14 +84,14 @@ function Chat() {
 
       let { data, error } = await supabase
         .from("conversations")
-        .select("*, products(title, image_url), store_products(title, image_url, stores(name))")
+        .select("*, buyer:profiles!conversations_buyer_id_fkey(id, full_name, avatar_url), seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url), products(title, image_url), store_products(title, image_url, stores(name))")
         .or(`buyer_id.eq.${currentSession.user.id},seller_id.eq.${currentSession.user.id}`)
         .order("created_at", { ascending: false });
 
       if (error) {
         const fallback = await supabase
           .from("conversations")
-          .select("*, products(title, image_url)")
+          .select("*, buyer:profiles!conversations_buyer_id_fkey(id, full_name, avatar_url), seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url), products(title, image_url)")
           .or(`buyer_id.eq.${currentSession.user.id},seller_id.eq.${currentSession.user.id}`)
           .order("created_at", { ascending: false });
 
@@ -140,7 +145,7 @@ function Chat() {
     }
 
     setMessage("");
-    loadMessages(activeConversation.id);
+    loadMessages(activeConversation.id, session.user.id);
   }
 
   return (
@@ -161,7 +166,7 @@ function Chat() {
               key={conversation.id}
               onClick={() => {
                 setActiveConversation(conversation);
-                loadMessages(conversation.id);
+                loadMessages(conversation.id, session?.user?.id);
               }}
             >
               <span>{getConversationTitle(conversation)}</span>
@@ -175,6 +180,22 @@ function Chat() {
         <section className="message-panel">
           {activeConversation ? (
             <>
+              {getOtherParticipant(activeConversation) && (
+                <Link className="chat-person-link" to={`/maes/${getOtherParticipant(activeConversation).id}`}>
+                  <span className="chat-person-avatar">
+                    {getOtherParticipant(activeConversation).avatar_url ? (
+                      <img src={getOtherParticipant(activeConversation).avatar_url} alt="" />
+                    ) : (
+                      getOtherParticipant(activeConversation).full_name?.charAt(0) || "M"
+                    )}
+                  </span>
+                  <span>
+                    <small>Conversando com</small>
+                    <strong>{getOtherParticipant(activeConversation).full_name || "Mae da comunidade"}</strong>
+                  </span>
+                  <span className="chat-profile-hint">Ver perfil</span>
+                </Link>
+              )}
               <div className="chat-product-strip">
                 {getConversationProduct(activeConversation)?.image_url && <img src={getConversationProduct(activeConversation).image_url} alt="" />}
                 <strong>{getConversationTitle(activeConversation)}</strong>

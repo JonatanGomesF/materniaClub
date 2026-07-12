@@ -1562,6 +1562,59 @@ select:focus {
   padding: 20px;
 }
 
+.chat-person-link {
+  align-items: center;
+  background: rgba(232, 79, 145, 0.1);
+  border: 1px solid rgba(232, 79, 145, 0.3);
+  border-radius: 10px;
+  color: inherit;
+  display: flex;
+  gap: 11px;
+  padding: 10px 12px;
+  text-decoration: none;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.chat-person-link:hover {
+  background: rgba(232, 79, 145, 0.16);
+  border-color: var(--rose-500);
+}
+
+.chat-person-link > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+}
+
+.chat-person-link small {
+  color: var(--muted);
+}
+
+.chat-person-avatar {
+  align-items: center;
+  background: var(--rose-500);
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  flex: 0 0 42px;
+  font-weight: 900;
+  height: 42px;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.chat-person-avatar img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.chat-profile-hint {
+  color: var(--rose-500);
+  font-size: 0.82rem;
+  font-weight: 800;
+  margin-left: auto;
+}
+
 .chat-product-strip {
   display: flex;
   align-items: center;

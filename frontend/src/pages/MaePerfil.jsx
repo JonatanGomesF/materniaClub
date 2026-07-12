@@ -89,7 +89,12 @@ function MaePerfil() {
   async function sendFriendRequest() {
     if (!supabase || !session?.user) return alert("Faca login para enviar uma solicitacao de amizade.");
     const { data, error } = await supabase.from("friendships").insert({ requester_id: session.user.id, addressee_id: id }).select().single();
-    if (error) return alert(error.code === "23505" ? "Ja existe uma solicitacao entre voces." : error.message);
+    if (error) {
+      if (error.code === "PGRST205" || error.message?.includes("friendships")) {
+        return alert("O recurso de amizades ainda precisa ser ativado no banco de dados. Execute o arquivo friendships-update.sql no SQL Editor do Supabase.");
+      }
+      return alert(error.code === "23505" ? "Ja existe uma solicitacao entre voces." : error.message);
+    }
     setFriendship(data);
   }
 
