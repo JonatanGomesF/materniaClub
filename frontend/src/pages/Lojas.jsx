@@ -47,7 +47,7 @@ function Lojas() {
   const [coverFile, setCoverFile] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const loadStores = useCallback(async (currentSession = session, currentProfile = profile) => {
+  const loadStores = useCallback(async (currentSession, currentProfile) => {
     if (!supabase) return;
 
     const { data: storeRows } = await supabase
@@ -98,7 +98,7 @@ function Lojas() {
 
       setMyProducts(mine || []);
     }
-  }, [profile, session]);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -225,6 +225,7 @@ function Lojas() {
   async function saveProduct(event) {
     event.preventDefault();
     if (!supabase || !session?.user || !store) return alert("Cadastre sua loja antes de publicar produtos.");
+    if (store.status !== "active") return alert("Sua loja ainda esta em analise e nao pode publicar produtos.");
     if (!productForm.title.trim() || !productForm.price) return alert("Informe nome e preco do produto.");
 
     setSaving(true);
@@ -250,7 +251,7 @@ function Lojas() {
       setProductForm(emptyProduct);
       setEditingProduct(null);
       setFile(null);
-      await loadStores(session);
+      await loadStores(session, profile);
     } catch (error) {
       alert(error.message);
     } finally {
@@ -261,7 +262,7 @@ function Lojas() {
   async function updateProductStatus(product, status) {
     const { error } = await supabase.from("store_products").update({ status }).eq("id", product.id);
     if (error) return alert(error.message);
-    loadStores(session);
+    loadStores(session, profile);
   }
 
   async function deleteProduct(product) {
@@ -270,7 +271,7 @@ function Lojas() {
 
     const { error } = await supabase.from("store_products").delete().eq("id", product.id);
     if (error) return alert(error.message);
-    loadStores(session);
+    loadStores(session, profile);
   }
 
   async function startStoreConversation(product) {
@@ -454,6 +455,8 @@ function Lojas() {
             </div>
           ) : (
             <>
+              {store?.status === "pending" && <p className="notice">Cadastro recebido. Sua loja esta em analise e sera liberada apos a aprovacao.</p>}
+              {store?.status === "rejected" && <p className="notice">O cadastro desta loja nao foi aprovado. Entre em contato com a administracao para revisar os dados.</p>}
               <form className="listing-form" onSubmit={saveStore}>
                 <h2>{store ? "Dados da loja" : "Cadastrar minha loja"}</h2>
                 <div className="store-media-editor">
@@ -475,7 +478,7 @@ function Lojas() {
                 <button className="primary-button" disabled={saving}>{saving ? "Salvando..." : store ? "Salvar loja" : "Criar loja"}</button>
               </form>
 
-              {store ? (
+              {store?.status === "active" ? (
                 <>
                   <form className="listing-form" onSubmit={saveProduct}>
                     <h2>{editingProduct ? "Editar produto" : "Cadastrar produto na vitrine"}</h2>
@@ -531,6 +534,8 @@ function Lojas() {
                     ))}
                   </div>
                 </>
+              ) : store ? (
+                <p className="notice">Os produtos serao liberados quando a loja for aprovada.</p>
               ) : (
                 <p className="notice">Depois de criar a loja, o cadastro de produtos aparece aqui automaticamente.</p>
               )}

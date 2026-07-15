@@ -8,6 +8,7 @@ function Admin() {
   const [stats, setStats] = useState(demoStats);
   const [users, setUsers] = useState([]);
   const [reports, setReports] = useState([]);
+  const [stores, setStores] = useState([]);
 
   useEffect(() => {
     async function loadAdmin() {
@@ -16,15 +17,17 @@ function Admin() {
 
       if (!supabase || currentProfile?.role !== "admin") return;
 
-      const [{ data: profiles }, { data: reportRows }, { count: posts }, { count: products }] = await Promise.all([
+      const [{ data: profiles }, { data: reportRows }, { data: storeRows }, { count: posts }, { count: products }] = await Promise.all([
         supabase.from("profiles").select("*").order("created_at", { ascending: false }),
         supabase.from("reports").select("*, reporter:profiles(full_name)").order("created_at", { ascending: false }),
+        supabase.from("stores").select("*").order("created_at", { ascending: false }),
         supabase.from("posts").select("*", { count: "exact", head: true }),
         supabase.from("products").select("*", { count: "exact", head: true }),
       ]);
 
       setUsers(profiles || []);
       setReports(reportRows || []);
+      setStores(storeRows || []);
       setStats({
         users: profiles?.length || 0,
         posts: posts || 0,
@@ -46,6 +49,13 @@ function Admin() {
     if (!supabase) return;
     await supabase.from("reports").update({ status: "resolved" }).eq("id", reportId);
     setReports((current) => current.map((report) => (report.id === reportId ? { ...report, status: "resolved" } : report)));
+  }
+
+  async function updateStoreStatus(storeId, status) {
+    if (!supabase) return;
+    const { error } = await supabase.from("stores").update({ status }).eq("id", storeId);
+    if (error) return alert(error.message);
+    setStores((current) => current.map((store) => (store.id === storeId ? { ...store, status } : store)));
   }
 
   const isAdmin = profile?.role === "admin";
@@ -73,6 +83,23 @@ function Admin() {
         <div className="idea-grid">
           {adminIdeas.map((idea) => <p key={idea}>{idea}</p>)}
         </div>
+      </section>
+
+      <section className="admin-section">
+        <h2>Solicitacoes de lojas</h2>
+        {stores.filter((store) => store.status === "pending").length === 0 ? (
+          <p className="empty-state">Nenhuma loja aguardando analise.</p>
+        ) : stores.filter((store) => store.status === "pending").map((store) => (
+          <div className="admin-row" key={store.id}>
+            <div>
+              <strong>{store.name}</strong>
+              <p>{store.city || "Sem cidade"} · CNPJ: {store.cnpj}</p>
+            </div>
+            <span className="tag">Em analise</span>
+            <button className="primary-button" onClick={() => updateStoreStatus(store.id, "active")}>Aprovar</button>
+            <button className="danger-button" onClick={() => updateStoreStatus(store.id, "rejected")}>Recusar</button>
+          </div>
+        ))}
       </section>
 
       <section className="admin-section">
