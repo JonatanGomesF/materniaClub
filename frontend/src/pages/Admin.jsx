@@ -9,6 +9,7 @@ function Admin() {
   const [users, setUsers] = useState([]);
   const [reports, setReports] = useState([]);
   const [stores, setStores] = useState([]);
+  const [adminMessage, setAdminMessage] = useState("");
 
   useEffect(() => {
     async function loadAdmin() {
@@ -53,12 +54,68 @@ function Admin() {
 
   async function updateStoreStatus(storeId, status) {
     if (!supabase) return;
-    const { error } = await supabase.from("stores").update({ status }).eq("id", storeId);
-    if (error) return alert(error.message);
-    setStores((current) => current.map((store) => (store.id === storeId ? { ...store, status } : store)));
+    setAdminMessage("");
+    const currentStore = stores.find((store) => store.id === storeId);
+
+    if (currentStore?.status === status) {
+      setAdminMessage(`${currentStore.name} ja esta como ${getStoreStatusLabel(status)}.`);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("stores")
+      .update({ status })
+      .eq("id", storeId)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      setAdminMessage(error.message);
+      return;
+    }
+
+    if (!data) {
+      setAdminMessage("Nao foi possivel alterar esta loja. Confirme se sua conta ainda esta como admin.");
+      return;
+    }
+
+    setStores((current) => current.map((store) => (store.id === storeId ? data : store)));
+    setAdminMessage(`${data.name} agora esta como ${getStoreStatusLabel(data.status)}.`);
   }
 
   const isAdmin = profile?.role === "admin";
+  const pendingStores = stores.filter((store) => store.status === "pending");
+
+  function getStoreStatusLabel(status) {
+    const labels = {
+      pending: "aguardando verificacao",
+      verified: "verificada",
+      rejected: "recusada",
+      suspended: "suspensa",
+      hidden: "oculta",
+      removed: "removida",
+    };
+
+    return labels[status] || status;
+  }
+
+  function renderStoreActions(store) {
+    return (
+      <div className="admin-actions">
+        {store.status !== "verified" && (
+          <button className="primary-button" onClick={() => updateStoreStatus(store.id, "verified")}>Verificar</button>
+        )}
+        {store.status === "verified" ? (
+          <button className="ghost-button" onClick={() => updateStoreStatus(store.id, "suspended")}>Suspender</button>
+        ) : store.status === "suspended" ? (
+          <button className="soft-button" onClick={() => updateStoreStatus(store.id, "verified")}>Reativar</button>
+        ) : null}
+        {store.status !== "rejected" && (
+          <button className="danger-button" onClick={() => updateStoreStatus(store.id, "rejected")}>Recusar</button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="page-shell admin-layout">
@@ -70,6 +127,7 @@ function Admin() {
 
       {!isSupabaseConfigured && <p className="notice">Modo demo: conecte o Supabase para administrar dados reais.</p>}
       {isSupabaseConfigured && !isAdmin && <p className="notice">Sua conta precisa ter role admin na tabela profiles.</p>}
+      {adminMessage && <p className="notice admin-feedback">{adminMessage}</p>}
 
       <section className="metric-grid">
         <div><strong>{stats.users}</strong><span>Usuarias</span></div>
@@ -87,17 +145,32 @@ function Admin() {
 
       <section className="admin-section">
         <h2>Solicitacoes de lojas</h2>
-        {stores.filter((store) => store.status === "pending").length === 0 ? (
+        {pendingStores.length === 0 ? (
           <p className="empty-state">Nenhuma loja aguardando analise.</p>
-        ) : stores.filter((store) => store.status === "pending").map((store) => (
+        ) : pendingStores.map((store) => (
           <div className="admin-row" key={store.id}>
             <div>
               <strong>{store.name}</strong>
               <p>{store.city || "Sem cidade"} · CNPJ: {store.cnpj}</p>
             </div>
-            <span className="tag">Em analise</span>
-            <button className="primary-button" onClick={() => updateStoreStatus(store.id, "active")}>Aprovar</button>
-            <button className="danger-button" onClick={() => updateStoreStatus(store.id, "rejected")}>Recusar</button>
+            <span className="tag">{getStoreStatusLabel(store.status)}</span>
+            {renderStoreActions(store)}
+          </div>
+        ))}
+      </section>
+
+      <section className="admin-section">
+        <h2>Lojas cadastradas</h2>
+        {stores.length === 0 ? (
+          <p className="empty-state">Nenhuma loja carregada.</p>
+        ) : stores.map((store) => (
+          <div className="admin-row" key={`store-${store.id}`}>
+            <div>
+              <strong>{store.name}</strong>
+              <p>{store.city || "Sem cidade"} · CNPJ: {store.cnpj}</p>
+            </div>
+            <span className="tag">{getStoreStatusLabel(store.status)}</span>
+            {renderStoreActions(store)}
           </div>
         ))}
       </section>

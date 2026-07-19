@@ -1,0 +1,180 @@
+materniaClub - Historias de usuario
+====================================
+
+Formato
+-------
+Como [tipo de usuario], quero [acao], para [beneficio].
+
+
+Historias - Mae / usuaria comum
+-------------------------------
+HU-001
+Como mae, quero criar uma conta com nome, cidade, email e senha, para participar
+da comunidade.
+
+HU-002
+Como mae, quero editar meu perfil com foto, cidade, bio e fase da maternidade,
+para que outras maes me reconhecam.
+
+HU-003
+Como mae, quero publicar no Feed com texto, imagem, categoria e valor opcional,
+para compartilhar promocao, duvida ou experiencia.
+
+HU-004
+Como mae, quero editar uma publicacao por ate 5 minutos, para corrigir texto,
+preco ou imagem rapidamente.
+
+HU-005
+Como mae, quero excluir minha publicacao, para remover conteudo que nao quero
+mais deixar visivel.
+
+HU-006
+Como mae, quero curtir publicacoes e produtos, para demonstrar interesse.
+
+HU-007
+Como mae, quero ver a quantidade de curtidas, para perceber se uma publicacao
+tem relevancia.
+
+HU-008
+Como mae, quero comentar publicacoes, para tirar duvidas e conversar com outras
+maes.
+
+HU-009
+Como mae, quero anunciar produto no Marketplace com foto, preco, cidade,
+categoria e estado, para vender desapegos.
+
+HU-010
+Como mae, quero marcar meu produto como vendido, para evitar receber novas
+mensagens de interesse.
+
+HU-011
+Como mae, quero liberar novamente um produto marcado como vendido, para voltar
+a vender caso a negociacao nao aconteca.
+
+HU-012
+Como mae compradora, quero clicar em "Tenho interesse", para abrir chat com a
+anunciante do produto.
+
+HU-013
+Como mae, quero ver distancia aproximada "a X km de voce", para priorizar itens
+perto de mim.
+
+HU-014
+Como mae, quero denunciar publicacoes, anuncios e ofertas, para ajudar a manter
+a comunidade segura.
+
+HU-015
+Como mae, quero ver vitrines de lojas verificadas, para encontrar promocoes
+infantis confiaveis.
+
+HU-016
+Como mae, quero clicar em "Comprar" em produto de loja, para conversar com a
+loja pelo chat.
+
+HU-017
+Como mae, quero ver "Nao disponivel" em produto vendido, para nao perder tempo
+em ofertas encerradas.
+
+
+Historias - Loja parceira
+-------------------------
+HU-101
+Como loja, quero criar uma conta separada de mae, com email, senha, CNPJ,
+cidade e nome da loja, para entrar no materniaClub como comercio.
+
+HU-102
+Como loja, quero cadastrar logo e foto de capa, para minha vitrine ter identidade
+visual.
+
+HU-103
+Como loja, quero editar dados da loja, para manter nome, cidade, descricao e
+imagens atualizadas.
+
+HU-104
+Como loja, quero cadastrar produtos com foto, preco, cidade, categoria e
+descricao, para montar minha vitrine.
+
+HU-105
+Como loja, quero ver "Minhas publicacoes", para administrar todos os meus
+produtos em um so lugar.
+
+HU-106
+Como loja, quero editar produto, para corrigir preco, foto ou descricao.
+
+HU-107
+Como loja, quero remover produto da vitrine, para esconder itens que nao quero
+mostrar publicamente.
+
+HU-108
+Como loja, quero excluir produto, para apagar definitivamente cadastros errados.
+
+HU-109
+Como loja, quero marcar produto como vendido, para indicar que nao esta
+disponivel.
+
+HU-110
+Como loja, quero liberar produto vendido, para voltar a vender quando houver
+estoque.
+
+HU-111
+Como loja, quero receber compradores no chat, para negociar diretamente.
+
+HU-112
+Como loja pendente, quero cadastrar e organizar minha vitrine antes da aprovacao,
+para ficar pronta quando o admin verificar.
+
+HU-113
+Como loja pendente, nao quero aparecer publicamente como verificada, para nao
+enganar as maes.
+
+
+Historias - Administrador
+-------------------------
+HU-201
+Como admin, quero ver lojas pendentes, para analisar CNPJ e informacoes.
+
+HU-202
+Como admin, quero verificar uma loja, para liberar vitrine publica, selo verde
+e ofertas no Feed.
+
+HU-203
+Como admin, quero recusar uma loja, para bloquear cadastros inadequados.
+
+HU-204
+Como admin, quero suspender uma loja, para interromper publicacoes quando houver
+problemas.
+
+HU-205
+Como admin, quero banir usuario, para proteger a comunidade.
+
+HU-206
+Como admin, quero reativar usuario, para corrigir suspensoes quando necessario.
+
+HU-207
+Como admin, quero resolver denuncias, para manter historico minimo de moderacao.
+
+HU-208
+Como admin, quero impedir que usuarios alterem role/status/account_type sozinhos,
+para manter seguranca.
+
+
+Historias - Sistema
+-------------------
+HU-301
+Como sistema, devo impedir que uma conta de loja use formularios de mae.
+
+HU-302
+Como sistema, devo impedir que uma conta de mae administre loja.
+
+HU-303
+Como sistema, devo exibir selo verde apenas para loja verificada.
+
+HU-304
+Como sistema, devo permitir que apenas participantes acessem uma conversa.
+
+HU-305
+Como sistema, devo impedir que lojas suspensas publiquem produtos.
+
+HU-306
+Como sistema, devo esconder publicamente produtos removidos ou ocultos.
+

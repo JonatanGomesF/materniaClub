@@ -1,0 +1,130 @@
+materniaClub - Admin, moderacao e operacao
+==========================================
+
+Objetivo do painel admin
+------------------------
+Dar ao dono da plataforma controle sobre seguranca, lojas, usuarios e conteudos
+fora da proposta do materniaClub.
+
+
+Funcoes atuais do admin
+-----------------------
+1. Ver lojas cadastradas.
+2. Ver lojas pendentes.
+3. Verificar loja.
+4. Suspender loja.
+5. Recusar loja.
+6. Ver denuncias.
+7. Resolver denuncias.
+8. Banir usuario.
+9. Reativar usuario.
+
+
+Verificacao de loja
+-------------------
+Status inicial: pending.
+
+Passos recomendados:
+1. Conferir nome da loja.
+2. Conferir CNPJ.
+3. Conferir cidade.
+4. Conferir se a proposta combina com produtos infantis.
+5. Conferir logo/capa se houver.
+6. Se estiver tudo correto, marcar como verified.
+7. Se estiver incompleto/suspeito, rejected ou suspended.
+
+Significado do status:
+- pending: aguardando analise.
+- verified: loja aprovada e com selo verde.
+- rejected: cadastro recusado.
+- suspended: loja pausada por problema.
+
+
+Moderacao de conteudo
+---------------------
+Conteudos que devem ser removidos ou denunciados:
+- Produtos fora do tema maternidade/criancas.
+- Golpes, links suspeitos ou promessas falsas.
+- Imagens inadequadas.
+- Spam repetitivo.
+- Ofensas ou assedio.
+- Dados sensiveis expostos.
+- Venda de itens proibidos.
+
+
+Denuncias
+---------
+Tipos esperados:
+- post
+- product
+- store_product
+- store
+- comment
+- profile
+
+Fluxo:
+1. Usuario denuncia.
+2. Admin abre painel.
+3. Admin analisa contexto.
+4. Admin resolve, descarta ou toma acao.
+
+
+Acoes administrativas recomendadas
+----------------------------------
+Em post:
+- Ocultar.
+- Remover.
+- Avisar autora.
+
+Em produto de mae:
+- Ocultar.
+- Remover.
+- Banir vendedora se for golpe.
+
+Em produto de loja:
+- Ocultar produto.
+- Suspender loja se houver reincidencia.
+
+Em loja:
+- Suspender.
+- Recusar.
+- Remover futuramente.
+
+Em usuario:
+- Suspender.
+- Banir.
+- Reativar.
+
+
+Historico futuro recomendado
+----------------------------
+Criar tabela admin_actions:
+- id
+- admin_id
+- action_type
+- target_type
+- target_id
+- reason
+- previous_status
+- new_status
+- created_at
+
+Isso permite saber quem tomou cada decisao e por que.
+
+
+Rotina operacional sugerida
+---------------------------
+Diariamente:
+- Ver lojas pendentes.
+- Ver denuncias abertas.
+- Checar posts recentes.
+
+Semanalmente:
+- Revisar lojas verificadas.
+- Checar usuarios banidos/suspensos.
+- Remover produtos antigos ou spam.
+
+Mensalmente:
+- Analisar metricas de lojas, produtos, chats e denuncias.
+- Ajustar regras da comunidade.
+

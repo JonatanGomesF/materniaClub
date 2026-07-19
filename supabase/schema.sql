@@ -62,7 +62,7 @@ create table public.posts (
   price numeric(10,2) check (price is null or price >= 0),
   image_url text,
   category text not null default 'promocao',
-  status text not null default 'published' check (status in ('published', 'hidden', 'removed')),
+  status text not null default 'published' check (status in ('published', 'sold', 'hidden', 'removed')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -93,7 +93,7 @@ create table public.stores (
   description text,
   logo_url text,
   cover_url text,
-  status text not null default 'active' check (status in ('active', 'hidden', 'removed')),
+  status text not null default 'pending' check (status in ('pending', 'verified', 'rejected', 'suspended', 'hidden', 'removed')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (owner_id),
@@ -109,7 +109,7 @@ create table public.store_products (
   category text not null,
   city text,
   image_url text,
-  status text not null default 'active' check (status in ('active', 'hidden', 'removed')),
+  status text not null default 'active' check (status in ('active', 'sold', 'hidden', 'removed')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -137,7 +137,7 @@ create table public.comments (
   user_id uuid not null references public.profiles(id) on delete cascade,
   post_id uuid not null references public.posts(id) on delete cascade,
   body text not null,
-  status text not null default 'published' check (status in ('published', 'hidden', 'removed')),
+  status text not null default 'published' check (status in ('published', 'sold', 'hidden', 'removed')),
   created_at timestamptz not null default now(),
   check (num_nonnulls(post_id, product_id, store_product_id) = 1)
 );
@@ -145,7 +145,7 @@ create table public.comments (
 create table public.reports (
   id uuid primary key default gen_random_uuid(),
   reporter_id uuid references public.profiles(id) on delete set null,
-  target_type text not null check (target_type in ('post', 'product', 'comment', 'profile')),
+  target_type text not null check (target_type in ('post', 'product', 'store_product', 'store', 'comment', 'profile')),
   target_id uuid not null,
   reason text not null,
   status text not null default 'open' check (status in ('open', 'reviewing', 'resolved', 'dismissed')),
@@ -219,6 +219,46 @@ returns boolean as $$
   );
 $$ language sql stable security definer;
 
+create or replace function public.protect_profile_sensitive_fields()
+returns trigger as $$
+begin
+  if public.is_admin() then
+    return new;
+  end if;
+
+  if new.account_type is distinct from old.account_type
+    or new.role is distinct from old.role
+    or new.status is distinct from old.status then
+    raise exception 'account_type, role e status so podem ser alterados por administradores';
+  end if;
+
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger protect_profile_sensitive_fields
+before update of account_type, role, status on public.profiles
+for each row execute function public.protect_profile_sensitive_fields();
+
+create or replace function public.protect_store_status()
+returns trigger as $$
+begin
+  if public.is_admin() then
+    return new;
+  end if;
+
+  if new.status is distinct from old.status then
+    raise exception 'status da loja so pode ser alterado por administradores';
+  end if;
+
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger protect_store_status
+before update of status on public.stores
+for each row execute function public.protect_store_status();
+
 alter table public.profiles enable row level security;
 alter table public.categories enable row level security;
 alter table public.posts enable row level security;
@@ -245,38 +285,50 @@ create policy "friendships participants delete" on public.friendships for delete
 create policy "categories public read" on public.categories for select using (true);
 create policy "categories admin write" on public.categories for all using (public.is_admin()) with check (public.is_admin());
 
-create policy "posts public read" on public.posts for select using (status = 'published' or author_id = auth.uid() or public.is_admin());
-create policy "posts owner insert" on public.posts for insert with check (auth.uid() = author_id and exists (select 1 from public.profiles where id = auth.uid() and status = 'active'));
+create policy "posts public read" on public.posts for select using (status in ('published', 'sold') or author_id = auth.uid() or public.is_admin());
+create policy "posts owner insert" on public.posts for insert with check (auth.uid() = author_id and exists (select 1 from public.profiles where id = auth.uid() and account_type = 'user' and status = 'active'));
 create policy "posts owner update" on public.posts for update using (author_id = auth.uid() or public.is_admin()) with check (author_id = auth.uid() or public.is_admin());
 create policy "posts admin delete" on public.posts for delete using (public.is_admin());
 
-create policy "products public read" on public.products for select using (status = 'active' or seller_id = auth.uid() or public.is_admin());
-create policy "products owner insert" on public.products for insert with check (auth.uid() = seller_id and exists (select 1 from public.profiles where id = auth.uid() and status = 'active'));
+create policy "products public read" on public.products for select using (status in ('active', 'sold') or seller_id = auth.uid() or public.is_admin());
+create policy "products owner insert" on public.products for insert with check (auth.uid() = seller_id and exists (select 1 from public.profiles where id = auth.uid() and account_type = 'user' and status = 'active'));
 create policy "products owner update" on public.products for update using (seller_id = auth.uid() or public.is_admin()) with check (seller_id = auth.uid() or public.is_admin());
 create policy "products owner delete" on public.products for delete using (seller_id = auth.uid() or public.is_admin());
 
-create policy "stores public read" on public.stores for select using (status = 'active' or owner_id = auth.uid() or public.is_admin());
-create policy "stores owner insert" on public.stores for insert with check (auth.uid() = owner_id);
+create policy "stores public read" on public.stores for select using (status = 'verified' or owner_id = auth.uid() or public.is_admin());
+create policy "stores owner insert" on public.stores for insert with check (
+  auth.uid() = owner_id
+  and status = 'pending'
+  and exists (select 1 from public.profiles where id = auth.uid() and account_type = 'store' and status = 'active')
+);
 create policy "stores owner update" on public.stores for update using (auth.uid() = owner_id or public.is_admin()) with check (auth.uid() = owner_id or public.is_admin());
-create policy "stores owner delete" on public.stores for delete using (auth.uid() = owner_id or public.is_admin());
+create policy "stores owner delete" on public.stores for delete using (public.is_admin());
 
 create policy "store products public read" on public.store_products for select using (
-  status = 'active'
+  (status in ('active', 'sold') and exists (select 1 from public.stores s where s.id = store_id and s.status = 'verified'))
   or exists (select 1 from public.stores s where s.id = store_id and s.owner_id = auth.uid())
   or public.is_admin()
 );
 create policy "store products owner insert" on public.store_products for insert with check (
-  exists (select 1 from public.stores s where s.id = store_id and s.owner_id = auth.uid())
+  exists (
+    select 1 from public.stores s
+    join public.profiles p on p.id = s.owner_id
+    where s.id = store_id
+    and s.owner_id = auth.uid()
+    and s.status = 'verified'
+    and p.account_type = 'store'
+    and p.status = 'active'
+  )
 );
 create policy "store products owner update" on public.store_products for update using (
-  exists (select 1 from public.stores s where s.id = store_id and s.owner_id = auth.uid())
+  exists (select 1 from public.stores s where s.id = store_id and s.owner_id = auth.uid() and s.status = 'verified')
   or public.is_admin()
 ) with check (
-  exists (select 1 from public.stores s where s.id = store_id and s.owner_id = auth.uid())
+  exists (select 1 from public.stores s where s.id = store_id and s.owner_id = auth.uid() and s.status = 'verified')
   or public.is_admin()
 );
 create policy "store products owner delete" on public.store_products for delete using (
-  exists (select 1 from public.stores s where s.id = store_id and s.owner_id = auth.uid())
+  exists (select 1 from public.stores s where s.id = store_id and s.owner_id = auth.uid() and s.status = 'verified')
   or public.is_admin()
 );
 

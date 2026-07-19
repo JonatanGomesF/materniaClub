@@ -1,0 +1,206 @@
+materniaClub - Diagrama de classes
+==================================
+
+Observacao
+----------
+O diagrama abaixo representa as entidades principais do sistema. O formato e
+Mermaid, mas esta salvo em TXT. Se quiser visualizar graficamente, copie o bloco
+para um renderizador Mermaid.
+
+
+Diagrama Mermaid
+----------------
+```mermaid
+classDiagram
+  class Profile {
+    uuid id
+    string full_name
+    string city
+    string bio
+    string avatar_url
+    string account_type
+    string motherhood_stage
+    string role
+    string status
+    datetime created_at
+    datetime updated_at
+  }
+
+  class Store {
+    uuid id
+    uuid owner_id
+    string name
+    string cnpj
+    string city
+    string description
+    string logo_url
+    string cover_url
+    string status
+    datetime created_at
+    datetime updated_at
+  }
+
+  class StoreProduct {
+    uuid id
+    uuid store_id
+    string title
+    string description
+    decimal price
+    string category
+    string city
+    string image_url
+    string status
+    datetime created_at
+    datetime updated_at
+  }
+
+  class Post {
+    uuid id
+    uuid author_id
+    string body
+    decimal price
+    string image_url
+    string category
+    string status
+    datetime created_at
+    datetime updated_at
+  }
+
+  class Product {
+    uuid id
+    uuid seller_id
+    string title
+    string description
+    decimal price
+    string category
+    string condition
+    string city
+    float latitude
+    float longitude
+    string image_url
+    string status
+    datetime created_at
+    datetime updated_at
+  }
+
+  class Comment {
+    uuid id
+    uuid user_id
+    uuid post_id
+    uuid product_id
+    uuid store_product_id
+    string body
+    string status
+    datetime created_at
+  }
+
+  class Like {
+    uuid id
+    uuid user_id
+    uuid post_id
+    uuid product_id
+    uuid store_product_id
+    datetime created_at
+  }
+
+  class ProductLike {
+    uuid id
+    uuid user_id
+    uuid product_id
+    datetime created_at
+  }
+
+  class Conversation {
+    uuid id
+    uuid product_id
+    uuid store_product_id
+    uuid buyer_id
+    uuid seller_id
+    datetime created_at
+  }
+
+  class Message {
+    uuid id
+    uuid conversation_id
+    uuid sender_id
+    string body
+    datetime read_at
+    datetime created_at
+  }
+
+  class Report {
+    uuid id
+    uuid reporter_id
+    string target_type
+    uuid target_id
+    string reason
+    string status
+    string admin_notes
+    datetime created_at
+    datetime resolved_at
+  }
+
+  class Friendship {
+    uuid id
+    uuid requester_id
+    uuid addressee_id
+    string status
+    datetime created_at
+    datetime updated_at
+  }
+
+  Profile "1" --> "0..1" Store : owner
+  Store "1" --> "0..*" StoreProduct : products
+  Profile "1" --> "0..*" Post : author
+  Profile "1" --> "0..*" Product : seller
+  Profile "1" --> "0..*" Comment : comments
+  Profile "1" --> "0..*" Like : likes
+  Product "1" --> "0..*" ProductLike : likes
+  Product "0..1" --> "0..*" Conversation : related_to
+  StoreProduct "0..1" --> "0..*" Conversation : related_to
+  Conversation "1" --> "0..*" Message : messages
+  Profile "1" --> "0..*" Message : sender
+  Profile "1" --> "0..*" Report : reporter
+  Profile "1" --> "0..*" Friendship : requester
+  Profile "1" --> "0..*" Friendship : addressee
+```
+
+
+Descricao das entidades
+-----------------------
+Profile
+Representa qualquer conta autenticada. Pode ser user, store ou admin/moderator.
+Campos sensiveis: account_type, role, status.
+
+Store
+Representa loja parceira. Possui CNPJ, status de verificacao e relacao com o
+profile dono.
+
+StoreProduct
+Produto cadastrado por uma loja. Pode aparecer na vitrine e no Feed se a loja
+for verified.
+
+Post
+Publicacao social de mae no Feed.
+
+Product
+Anuncio de mae no Marketplace.
+
+Comment
+Comentario em post/produto. Atualmente deve apontar para apenas um alvo.
+
+Like e ProductLike
+Curtidas em publicacoes ou produtos.
+
+Conversation
+Conversa entre comprador e vendedor. Pode estar ligada a Product ou StoreProduct.
+
+Message
+Mensagem dentro de uma conversa.
+
+Report
+Denuncia de conteudo.
+
+Friendship
+Relacao de amizade entre maes.
+

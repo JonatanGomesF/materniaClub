@@ -1,0 +1,143 @@
+materniaClub - Requisitos e regras de negocio
+==============================================
+
+Requisitos funcionais
+---------------------
+RF-001 - Cadastro de usuario comum
+O sistema deve permitir cadastro de maes/usuarias com nome, cidade, fase da
+maternidade, email e senha.
+
+RF-002 - Cadastro de loja
+O sistema deve permitir cadastro de lojas com nome, CNPJ, cidade, descricao,
+email e senha.
+
+RF-003 - Login
+O sistema deve permitir login por email e senha.
+
+RF-004 - Perfil de mae
+O sistema deve permitir que usuaria comum edite foto, nome, cidade, fase da
+maternidade e bio.
+
+RF-005 - Feed
+O sistema deve permitir que maes publiquem posts com texto, imagem, categoria
+e valor opcional.
+
+RF-006 - Marketplace
+O sistema deve permitir que maes criem anuncios de produtos infantis com foto,
+preco, cidade, categoria, estado e localizacao.
+
+RF-007 - Vitrine de lojas
+O sistema deve permitir que lojas tenham vitrine com produtos infantis.
+
+RF-008 - Verificacao de loja
+O sistema deve permitir que admin aprove/verifique lojas.
+
+RF-009 - Chat
+O sistema deve criar conversa quando uma usuaria demonstrar interesse em produto
+de mae ou clicar em comprar produto de loja.
+
+RF-010 - Moderacao
+O sistema deve permitir denuncia de post, produto, oferta de loja, comentario
+e perfil.
+
+RF-011 - Curtidas
+O sistema deve permitir curtidas em posts e produtos de mae. A quantidade deve
+ser visivel.
+
+RF-012 - Produto vendido
+O sistema deve permitir marcar produto como vendido e liberar novamente.
+
+
+Requisitos nao funcionais
+-------------------------
+RNF-001 - Seguranca
+Permissoes criticas devem ser protegidas no Supabase com RLS, politicas e
+triggers. Nao basta esconder botoes no frontend.
+
+RNF-002 - Usabilidade
+As telas devem ser simples, responsivas e adequadas para uso mobile.
+
+RNF-003 - Clareza
+Conta de mae e conta de loja devem ter navegacoes diferentes.
+
+RNF-004 - Confianca
+O selo "Loja verificada" deve aparecer somente quando o admin aprovar a loja.
+
+RNF-005 - Performance
+O build indica bundle acima de 500 KB. Futuramente, aplicar code splitting por
+pagina.
+
+RNF-006 - Auditoria futura
+Decisoes administrativas deveriam ser registradas em historico.
+
+
+Regras de negocio
+-----------------
+RN-001 - Marketplace e para maes
+Somente contas do tipo user podem publicar no Marketplace.
+
+RN-002 - Loja nao acessa Perfil de mae
+Conta de loja nao deve ver nem acessar a pagina Perfil, Amigos, Feed de mae ou
+Marketplace de mae.
+
+RN-003 - Loja usa Minha loja
+Conta de loja administra produtos pela area Lojas > Minha loja.
+
+RN-004 - Loja inicia pendente
+Toda loja nova deve iniciar com status pending.
+
+RN-005 - Loja verificada
+Somente admin pode mudar status de loja para verified.
+
+RN-006 - Selo verde
+O selo "Loja verificada" so aparece se stores.status = verified.
+
+RN-007 - Publicacao comercial no Feed
+Produtos de lojas verificadas podem aparecer no Feed como "Patrocinado" ou
+"Oferta de loja".
+
+RN-008 - Loja pendente
+Loja pending pode preparar dados e produtos em area privada, mas nao deve
+aparecer publicamente como verificada.
+
+RN-009 - Loja suspensa
+Loja suspended nao deve publicar novos produtos nem aparecer publicamente.
+
+RN-010 - Produto de loja
+Produto de loja pertence a uma loja. A loja so pode alterar produtos da propria
+vitrine.
+
+RN-011 - Produto vendido
+Produto sold continua visivel com visual acinzentado e selo "Nao disponivel".
+O botao comprar/interesse deve ficar bloqueado.
+
+RN-012 - Produto oculto/removido
+Produto hidden ou removed nao aparece publicamente.
+
+RN-013 - Edicao de post
+Post de mae pode ser editado apenas nos primeiros 5 minutos.
+
+RN-014 - Exclusao de post
+Autor pode excluir publicacao. A exclusao deve remover da visao publica.
+
+RN-015 - Campos sensiveis
+account_type, role e status de profiles nao podem ser alterados pelo usuario
+comum.
+
+RN-016 - Conversas
+Somente buyer, seller ou admin podem ler conversas.
+
+RN-017 - Denuncia
+Qualquer usuario logado pode denunciar conteudo.
+
+RN-018 - CNPJ
+Loja deve informar CNPJ. Validacao atual verifica numeros; validacao formal de
+digito pode ser melhoria futura.
+
+RN-019 - Admin
+Admin e definido por profiles.role = admin.
+
+RN-020 - Dados sensiveis
+A plataforma deve orientar usuarias a nao compartilhar endereco completo, dados
+bancarios ou documentos no Feed e Marketplace.
+

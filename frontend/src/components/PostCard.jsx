@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 
-function PostCard({ post, onDelete, onLike, onReport, onUpdate, currentUserId }) {
+function PostCard({ post, onDelete, onInterest, onLike, onReport, onStatusChange, onUpdate, currentUserId }) {
   const navigate = useNavigate();
   const [commentsOpen, setCommentsOpen] = useState(true);
   const [comments, setComments] = useState([]);
@@ -18,6 +18,7 @@ function PostCard({ post, onDelete, onLike, onReport, onUpdate, currentUserId })
   const [now, setNow] = useState(() => Date.now());
   const isStorePublication = post.is_store_publication || post.profiles?.account_type === "store";
   const isStoreProduct = Boolean(post.store_product_id);
+  const isUnavailable = post.status === "sold";
   const author = post.profiles?.full_name || "Mae da comunidade";
   const city = post.profiles?.city || "materniaClub";
   const date = post.created_at
@@ -33,7 +34,8 @@ function PostCard({ post, onDelete, onLike, onReport, onUpdate, currentUserId })
 
   function openProfile() {
     if (isStorePublication) {
-      navigate("/lojas");
+      const storeQuery = post.store_id ? `?store=${post.store_id}${post.store_product_id ? `&produto=${post.store_product_id}` : ""}` : "";
+      navigate(`/lojas${storeQuery}`);
       return;
     }
     if (post.author_id) navigate(`/maes/${post.author_id}`);
@@ -52,7 +54,9 @@ function PostCard({ post, onDelete, onLike, onReport, onUpdate, currentUserId })
   }
 
   useEffect(() => {
-    if (!supabase || !post.id) return;
+    if (!supabase || !post.id || isStoreProduct) {
+      return undefined;
+    }
     let active = true;
     supabase
       .from("comments")
@@ -137,7 +141,7 @@ function PostCard({ post, onDelete, onLike, onReport, onUpdate, currentUserId })
   }
 
   return (
-    <article className="post-card clickable-card" onClick={openProfile}>
+    <article className={isUnavailable ? "post-card clickable-card unavailable-card" : "post-card clickable-card"} onClick={openProfile}>
       <div className="card-header">
         <div className="avatar">
           {post.profiles?.avatar_url ? <img src={post.profiles.avatar_url} alt="" /> : author.charAt(0)}
@@ -145,7 +149,7 @@ function PostCard({ post, onDelete, onLike, onReport, onUpdate, currentUserId })
         <div>
           <div className="post-author-line">
             <h3>{author}</h3>
-            {isStorePublication && <span className="verified-store-badge" title="Conta comercial verificada pela plataforma"><span aria-hidden="true">✓</span> Loja verificada</span>}
+            {isStorePublication && post.is_verified_store ? (<span className="verified-store-badge" title="Loja analisada e aprovada pelo admin"><span aria-hidden="true">OK</span> Loja verificada</span>) : isStorePublication ? (<span className="store-offer-badge">Oferta de loja</span>) : null}
           </div>
           <p>{city} · {date}</p>
         </div>
@@ -175,6 +179,7 @@ function PostCard({ post, onDelete, onLike, onReport, onUpdate, currentUserId })
         </form>
       ) : (
         <div>
+          {isUnavailable && <span className="unavailable-inline">Nao disponivel</span>}
           {isStoreProduct && <h3 className="store-product-title">{post.title}</h3>}
           <p className="post-body">{post.body || post.texto}</p>
         </div>
@@ -183,12 +188,24 @@ function PostCard({ post, onDelete, onLike, onReport, onUpdate, currentUserId })
       {price && <strong className="post-price">{price}</strong>}
 
       {post.image_url || post.imagem ? (
-        <img className="post-image" src={post.image_url || post.imagem} alt="Publicacao da comunidade" />
+        <div className="post-image-wrap">
+          <img className="post-image" src={post.image_url || post.imagem} alt="Publicacao da comunidade" />
+          {isUnavailable && <span className="unavailable-ribbon">Nao disponivel</span>}
+        </div>
       ) : null}
 
       <div className="card-actions">
         {!isStoreProduct && <span className="post-like-count">{likesCount} {likesCount === 1 ? "curtida" : "curtidas"}</span>}
-        {isStoreProduct && <button className="primary-button small" onClick={(event) => { event.stopPropagation(); navigate("/lojas"); }}>Ver oferta na loja</button>}
+        {isStoreProduct && <span className="store-offer-label">Patrocinado · Oferta de loja</span>}
+        {isStoreProduct && !isUnavailable && <button className="soft-button small" onClick={(event) => {
+          event.stopPropagation();
+          openProfile();
+        }}>Ver oferta</button>}
+        {isStoreProduct && !isUnavailable && !isOwner && onInterest && <button className="primary-button small" onClick={(event) => {
+          event.stopPropagation();
+          onInterest(post);
+        }}>Comprar</button>}
+        {isStoreProduct && isUnavailable && <button className="soft-button small" disabled onClick={(event) => event.stopPropagation()}>Nao disponivel</button>}
         {onLike && (
           <button className={post.liked_by_me ? "soft-button active-like" : "soft-button"} onClick={(event) => {
             event.stopPropagation();
@@ -202,6 +219,10 @@ function PostCard({ post, onDelete, onLike, onReport, onUpdate, currentUserId })
           event.stopPropagation();
           onReport?.(post);
         }}>Denunciar</button>}
+        {isOwner && onStatusChange && <button className="soft-button" onClick={(event) => {
+          event.stopPropagation();
+          onStatusChange(post, isUnavailable ? (isStoreProduct ? "active" : "published") : "sold");
+        }}>{isUnavailable ? "Liberar venda" : "Marcar vendido"}</button>}
         {isOwner && canEditPost && onUpdate && <button className="soft-button" onClick={startPostEdit}>Editar publicacao</button>}
         {isOwner && onDelete && <button className="danger-button" onClick={(event) => {
           event.stopPropagation();
@@ -241,3 +262,4 @@ function PostCard({ post, onDelete, onLike, onReport, onUpdate, currentUserId })
 }
 
 export default PostCard;
+

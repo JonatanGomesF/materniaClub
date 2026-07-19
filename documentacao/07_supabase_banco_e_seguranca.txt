@@ -1,0 +1,158 @@
+materniaClub - Supabase, banco e seguranca
+==========================================
+
+Objetivo
+--------
+Documentar as principais tabelas, status e regras de seguranca esperadas no
+Supabase.
+
+
+Tabelas principais
+------------------
+profiles
+- id
+- full_name
+- city
+- bio
+- avatar_url
+- account_type: user ou store
+- motherhood_stage
+- role: user, moderator ou admin
+- status: active, suspended ou banned
+
+stores
+- id
+- owner_id
+- name
+- cnpj
+- city
+- description
+- logo_url
+- cover_url
+- status: pending, verified, rejected, suspended, hidden, removed
+
+store_products
+- id
+- store_id
+- title
+- description
+- price
+- category
+- city
+- image_url
+- status: active, sold, hidden, removed
+
+posts
+- Publicacoes sociais de maes.
+- status: published, sold, hidden, removed
+
+products
+- Anuncios de maes no Marketplace.
+- status: active, sold, expired, hidden, removed
+
+conversations
+- Conversas entre buyer e seller.
+- Pode referenciar product_id ou store_product_id.
+
+messages
+- Mensagens dentro de uma conversa.
+
+reports
+- Denuncias contra post, product, store_product, store, comment ou profile.
+
+
+Status importantes
+------------------
+Store.status
+- pending: loja cadastrada aguardando verificacao.
+- verified: loja aprovada pelo admin, com selo verde.
+- rejected: loja recusada.
+- suspended: loja temporariamente bloqueada.
+- hidden: loja oculta.
+- removed: loja removida.
+
+StoreProduct.status
+- active: produto disponivel.
+- sold: produto vendido/nao disponivel.
+- hidden: produto removido da vitrine.
+- removed: produto removido.
+
+Profile.status
+- active: conta ativa.
+- suspended: conta suspensa.
+- banned: conta banida.
+
+
+Regras de RLS esperadas
+-----------------------
+profiles
+- Usuario pode ler perfis nao banidos.
+- Usuario pode atualizar dados comuns do proprio perfil.
+- Usuario comum nao pode alterar account_type, role ou status.
+- Admin pode alterar campos sensiveis.
+
+stores
+- Publico le apenas lojas verified.
+- Dono le a propria loja mesmo pending.
+- Insercao exige account_type=store, status active no profile e status=pending.
+- Somente admin muda status da loja.
+
+store_products
+- Publico le produtos active/sold apenas de lojas verified.
+- Dono le produtos da propria loja.
+- Inserir produto deve exigir loja do usuario e permissao adequada.
+- Lojas suspensas nao devem publicar publicamente.
+
+posts
+- Publico le published/sold.
+- Apenas conta user deve criar post social.
+- Conta store nao deve criar post social comum.
+
+products
+- Publico le active/sold.
+- Apenas conta user deve criar produto no Marketplace.
+- Conta store nao deve criar produto no Marketplace.
+
+conversations/messages
+- Apenas buyer, seller ou admin acessam conversa.
+- Mensagem so pode ser enviada por participante autenticado.
+
+
+Triggers e funcoes importantes
+------------------------------
+is_admin()
+- Retorna true se auth.uid() pertence a profile com role admin/moderator e status active.
+
+protect_profile_sensitive_fields()
+- Bloqueia alteracao de account_type, role e status por usuario comum.
+
+protect_store_status()
+- Bloqueia alteracao de status de loja por nao-admin.
+
+set_updated_at()
+- Atualiza updated_at automaticamente.
+
+
+Arquivos SQL importantes
+------------------------
+supabase/schema.sql
+Schema completo para reset/criacao.
+
+supabase/security-store-verification-update.sql
+Atualizacao incremental mais importante para seguranca e verificacao real de lojas.
+
+supabase/store-products-sold-update.sql
+Permite produto de loja vendido e visivel como "Nao disponivel".
+
+supabase/feed-sold-update.sql
+Permite posts do Feed marcados como vendidos.
+
+
+Alertas tecnicos
+----------------
+1. Nunca confiar apenas no frontend para permissao.
+2. O anon key do Supabase fica no browser, entao RLS precisa estar correta.
+3. Campos role/account_type/status sao sensiveis.
+4. O selo "Loja verificada" deve depender do banco, nao de texto da interface.
+5. Produtos comerciais no Feed devem vir apenas de lojas verified.
+

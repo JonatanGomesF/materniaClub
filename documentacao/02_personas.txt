@@ -1,0 +1,146 @@
+materniaClub - Personas
+=======================
+
+Persona 1 - Isabele, mae compradora
+-----------------------------------
+Idade: 28 anos
+Cidade: Itu
+Perfil: Mae de primeira viagem
+
+Contexto:
+Isabele tem um bebe pequeno e compra fraldas, mamadeiras, roupinhas e itens de
+rotina com frequencia. Ela quer economizar, mas tambem quer seguranca para nao
+cair em golpes.
+
+Objetivos:
+- Encontrar fraldas e itens infantis com preco bom.
+- Ver ofertas perto dela.
+- Conversar rapidamente com quem anunciou.
+- Saber se uma loja e confiavel.
+
+Dores:
+- Grupos de WhatsApp e Facebook sao baguncados.
+- Promocoes somem rapido.
+- Nem sempre sabe se a pessoa ou loja e confiavel.
+- Nao quer perder tempo com produto ja vendido.
+
+Funcionalidades importantes:
+- Marketplace com distancia.
+- Botao "Tenho interesse".
+- Produto vendido com "Nao disponivel".
+- Loja verificada.
+- Denuncia de conteudo suspeito.
+
+
+Persona 2 - Camila, gestante montando enxoval
+---------------------------------------------
+Idade: 31 anos
+Cidade: Sorocaba
+Perfil: Gestante
+
+Contexto:
+Camila esta gravida e pesquisando carrinho, bebe conforto, fraldas, chupetas,
+mamadeiras e itens de quarto. Ela ainda nao sabe tudo que precisa comprar.
+
+Objetivos:
+- Descobrir quais produtos outras maes recomendam.
+- Comparar ofertas de lojas e desapegos.
+- Salvar dinheiro no enxoval.
+- Ler experiencias reais de outras maes.
+
+Dores:
+- Muitas opcoes e marcas confundem.
+- Medo de comprar item errado.
+- Dificuldade em encontrar promocoes reais.
+
+Funcionalidades importantes:
+- Feed com dicas e experiencias.
+- Vitrine de lojas infantis.
+- Comentarios em posts de maes.
+- Chat para tirar duvidas sobre produto.
+
+
+Persona 3 - Natalia, mae vendedora
+----------------------------------
+Idade: 34 anos
+Cidade: Campinas
+Perfil: Mae experiente
+
+Contexto:
+Natalia tem produtos que o filho nao usa mais: carrinho, bebe conforto,
+roupinhas e brinquedos. Ela quer vender de forma simples.
+
+Objetivos:
+- Publicar produto com foto, preco e cidade.
+- Receber interessadas no chat.
+- Marcar item como vendido.
+- Excluir publicacao quando quiser.
+
+Dores:
+- Recebe mensagem mesmo quando produto ja vendeu.
+- Plataformas genericas nao sao focadas em maternidade.
+- Nao quer expor dados pessoais.
+
+Funcionalidades importantes:
+- Marketplace entre maes.
+- Botao "Marcar vendido" e "Liberar venda".
+- Excluir publicacao.
+- Chat direto com interessada.
+
+
+Persona 4 - Pikoli, loja parceira
+---------------------------------
+Tipo: Loja infantil
+Cidade: Itu
+Documento: CNPJ
+
+Contexto:
+A loja vende artigos infantis e quer divulgar promocoes para maes locais.
+Ela precisa de uma vitrine simples, com produtos, fotos, preco e chat.
+
+Objetivos:
+- Cadastrar loja com CNPJ, logo e capa.
+- Cadastrar produtos infantis.
+- Aparecer para maes depois da verificacao.
+- Receber contatos pelo chat.
+- Marcar produto como vendido ou liberar de novo.
+
+Dores:
+- Redes sociais misturam publico sem intencao de compra.
+- Precisa mostrar confianca.
+- Quer publicar sem depender de campanha paga complexa.
+
+Funcionalidades importantes:
+- Cadastro de loja separado de conta de mae.
+- Selo "Loja verificada" somente apos admin aprovar.
+- Minha loja / Minhas publicacoes.
+- Produto comercial no Feed como "Oferta de loja".
+
+
+Persona 5 - Jonatan, administrador
+----------------------------------
+Perfil: Dono da plataforma
+
+Contexto:
+Jonatan quer manter o materniaClub seguro, organizado e com lojas reais.
+Ele precisa controlar usuarios, lojas, denuncias e conteudos fora da proposta.
+
+Objetivos:
+- Aprovar lojas depois de analisar CNPJ.
+- Suspender loja ou usuario problematico.
+- Resolver denuncias.
+- Evitar que usuarios mudem permissao sozinhos.
+- Garantir que o selo verde tenha valor.
+
+Dores:
+- Conteudo fora do nicho pode prejudicar a comunidade.
+- Lojas falsas podem afetar confianca.
+- Usuários tecnicos podem tentar alterar dados no Supabase.
+
+Funcionalidades importantes:
+- Painel admin.
+- Status de loja: pending, verified, rejected, suspended.
+- Status de usuario: active, suspended, banned.
+- RLS no Supabase.
+- Historico futuro de decisoes administrativas.
+

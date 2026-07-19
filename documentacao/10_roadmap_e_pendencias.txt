@@ -1,0 +1,136 @@
+materniaClub - Roadmap e pendencias
+===================================
+
+Prioridade alta
+---------------
+1. Confirmar SQL de seguranca no Supabase
+Rodar e validar security-store-verification-update.sql.
+
+2. Minhas publicacoes para loja
+Garantir que loja pendente consiga preparar produtos em area privada, mas que
+somente lojas verified aparecam publicamente.
+
+3. Notificacoes no lugar de alert()
+Substituir alert por mensagens elegantes dentro da tela.
+
+4. Fluxos de senha
+Adicionar:
+- Esqueci minha senha.
+- Reenviar confirmacao de email.
+- Alterar email.
+- Alterar senha.
+
+5. Termos e politica
+Criar paginas:
+- Termos de uso.
+- Politica de privacidade.
+- Regras da comunidade.
+
+
+Prioridade media
+----------------
+1. Historico administrativo
+Criar tabela admin_actions.
+
+2. Validacao real de CNPJ
+Validar digitos do CNPJ, nao apenas quantidade de numeros.
+
+3. Comentarios e curtidas comerciais
+Decidir se produtos de loja terao curtidas/comentarios ou apenas comprar/chat.
+
+4. Filtros
+Adicionar filtros por:
+- cidade
+- categoria
+- preco
+- distancia
+- disponivel/nao disponivel
+- loja verificada
+
+5. Busca
+Busca por produto, loja e mae.
+
+6. Notificacoes de chat
+Melhorar avisos de mensagens nao lidas.
+
+
+Prioridade tecnica
+------------------
+1. Testes automatizados
+Criar testes para:
+- Mae nao administra loja.
+- Loja administra somente propria vitrine.
+- Usuario nao vira admin.
+- Loja pending nao aparece publicamente.
+- Loja verified aparece no Feed.
+- Produto sold fica indisponivel.
+- Conversas so sao acessadas pelos participantes.
+
+2. Code splitting
+O Vite avisa que o bundle principal passou de 500 KB.
+Separar paginas com React.lazy e Suspense:
+- Feed
+- Marketplace
+- Lojas
+- Chat
+- Admin
+
+3. Centralizar sessao
+Hoje varias telas chamam getCurrentSession.
+Criar um AuthContext para evitar consultas repetidas.
+
+4. Camada de servicos
+Criar arquivos de servico:
+- services/authService.js
+- services/storeService.js
+- services/feedService.js
+- services/chatService.js
+- services/adminService.js
+
+5. Melhorar estados de carregamento
+Adicionar skeleton/loading em Feed, Lojas, Marketplace e Admin.
+
+
+Possiveis formas de monetizacao
+-------------------------------
+1. Lojas pagam assinatura para ter vitrine.
+2. Lojas compram creditos/moedas para destacar produtos.
+3. Produtos em destaque no Feed.
+4. Plano gratuito limitado e plano premium para lojas.
+5. Cupom patrocinado por loja parceira.
+
+
+Ideia de moeda interna
+----------------------
+Nome possivel:
+- ClubCoins
+- MaterniCoins
+- Moedinhas maternia
+
+Uso:
+- Destacar produto por 24h.
+- Subir produto na vitrine.
+- Aparecer no Feed como oferta patrocinada.
+- Enviar cupom para usuarias da cidade.
+
+Gatilhos de compra:
+- Urgencia: "Seu destaque termina hoje".
+- Escassez: "Restam 3 destaques nesta categoria".
+- Resultado: "Produtos destacados recebem mais conversas".
+- Conveniencia: "Use moedas para impulsionar sem criar campanha".
+
+
+Riscos
+------
+1. Loja falsa se aprovar sem verificacao.
+2. Usuario tentar alterar permissao pelo Supabase.
+3. Conteudo fora da proposta contaminar o Feed.
+4. Falta de politica de privacidade em app com dados pessoais.
+5. Mensagens com dados sensiveis sem orientacao.
+
+
+Proximo passo recomendado
+-------------------------
+Concluir a area "Minhas publicacoes" para lojas, permitindo preparar produtos
+antes da verificacao, mas mantendo a publicacao publica bloqueada ate verified.
+

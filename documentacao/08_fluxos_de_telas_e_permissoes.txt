@@ -1,0 +1,152 @@
+materniaClub - Fluxos de telas e permissoes
+===========================================
+
+Tipos de conta
+--------------
+Visitante
+- Pode ver telas publicas se permitido.
+- Deve fazer login para postar, curtir, comentar, comprar ou denunciar.
+
+Mae / usuaria comum
+- Feed
+- Marketplace
+- Lojas
+- Amigos
+- Chat
+- Perfil
+
+Loja
+- Lojas
+- Minha loja
+- Minhas publicacoes
+- Chat
+- Admin, somente se tambem possuir role admin
+
+Admin
+- Todas as areas administrativas.
+
+
+Navbar esperada
+---------------
+Visitante
+- Feed
+- Marketplace
+- Lojas
+- Amigos
+- Chat
+- Entrar
+
+Mae logada
+- Feed
+- Marketplace
+- Lojas
+- Amigos
+- Chat
+- Perfil
+- Sair
+
+Loja logada
+- Lojas
+- Chat
+- Sair
+
+Admin logado
+- Admin aparece se role=admin ou moderator.
+
+
+Rotas e permissoes
+------------------
+/login
+Publica.
+
+/
+Feed.
+Conta loja deve ser redirecionada para /lojas?view=manage.
+
+/marketplace
+Marketplace de maes.
+Conta loja deve ser redirecionada para /lojas?view=manage.
+
+/lojas
+Vitrine publica e painel de loja.
+Visitante/mae ve vitrine de lojas verificadas.
+Loja ve Minha loja e Chat.
+
+/perfil
+Somente mae/usuario comum.
+Loja redireciona para /lojas.
+
+/amigos
+Somente mae/usuario comum.
+Loja redireciona para /lojas?view=manage.
+
+/chat
+Usuario logado deve acessar conversas das quais participa.
+
+/admin
+Somente role admin.
+
+
+Fluxo de mae
+------------
+1. Entra no app.
+2. Ve Feed.
+3. Pode publicar no Feed.
+4. Pode ir ao Marketplace.
+5. Pode anunciar produto.
+6. Pode entrar em Lojas e comprar oferta.
+7. Pode abrir chat com mae ou loja.
+8. Pode editar Perfil.
+
+
+Fluxo de loja
+-------------
+1. Entra no app.
+2. Vai para /lojas?view=manage.
+3. Edita dados da loja.
+4. Cadastra produtos em Minhas publicacoes.
+5. Se pending, produtos ficam privados/preparados.
+6. Se verified, produtos aparecem na vitrine publica e Feed comercial.
+7. Recebe contatos no Chat.
+
+
+Fluxo de admin
+--------------
+1. Entra no app.
+2. Abre Admin.
+3. Ve lojas pendentes.
+4. Analisa CNPJ e dados.
+5. Clica Verificar, Suspender ou Recusar.
+6. Analisa denuncias.
+7. Bane ou reativa usuarios.
+
+
+Permissoes por acao
+-------------------
+Postar no Feed
+- Permitido: user
+- Bloqueado: store
+
+Anunciar no Marketplace
+- Permitido: user
+- Bloqueado: store
+
+Cadastrar produto de loja
+- Permitido: store dona da loja
+- Publicacao publica: apenas loja verified
+
+Ver vitrine publica
+- Permitido: todos
+- Conteudo: apenas lojas verified
+
+Alterar status de loja
+- Permitido: admin
+- Bloqueado: loja e mae
+
+Alterar account_type/role/status do perfil
+- Permitido: admin
+- Bloqueado: usuario comum
+
+Conversar
+- Permitido: participantes da conversa
+

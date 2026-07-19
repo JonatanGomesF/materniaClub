@@ -1,0 +1,54 @@
+materniaClub - Documentacao do projeto
+=====================================
+
+Objetivo desta pasta
+--------------------
+Esta pasta guarda a documentacao funcional e tecnica do appweb materniaClub.
+Os arquivos estao em TXT para leitura simples no VS Code, sem depender de
+ferramentas externas.
+
+Indice dos arquivos
+-------------------
+01_visao_geral.txt
+Resumo do produto, proposta de valor, publico-alvo e modulos principais.
+
+02_personas.txt
+Personas principais: mae compradora, gestante, mae vendedora, loja parceira e admin.
+
+03_historias_de_usuario.txt
+Historias de usuario organizadas por tipo de conta e modulo.
+
+04_requisitos_e_regras_de_negocio.txt
+Requisitos funcionais, nao funcionais e regras criticas da plataforma.
+
+05_diagrama_de_classes.txt
+Diagrama de classes em formato textual e Mermaid.
+
+06_diagramas_de_sequencia.txt
+Fluxos principais em diagramas de sequencia Mermaid.
+
+07_supabase_banco_e_seguranca.txt
+Modelo de dados, RLS, status, permissoes e regras de seguranca no Supabase.
+
+08_fluxos_de_telas_e_permissoes.txt
+Quem acessa cada tela, navegacao esperada e permissoes por perfil.
+
+09_admin_moderacao_e_operacao.txt
+O que o painel admin administra e rotinas recomendadas.
+
+10_roadmap_e_pendencias.txt
+Melhorias futuras, riscos tecnicos e proximos passos.
+
+Resumo rapido
+-------------
+materniaClub e uma rede social + marketplace focada em maes, gestantes e lojas
+infantis. Maes podem postar no Feed, anunciar desapegos no Marketplace, curtir,
+comentar e conversar. Lojas possuem conta separada, vitrine de produtos, CNPJ,
+logo e precisam ser verificadas pelo admin antes de aparecer publicamente como
+"Loja verificada".
+
+Decisao importante
+------------------
+Marketplace e para maes/usuarias comuns.
+Lojas usam a area Lojas > Minha loja para gerenciar produtos e vitrine.
+

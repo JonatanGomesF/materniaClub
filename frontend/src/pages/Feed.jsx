@@ -23,7 +23,7 @@ function Feed() {
     const { data, error } = await supabase
       .from("posts")
       .select("*, profiles(full_name, city, status, avatar_url, account_type)")
-      .eq("status", "published")
+      .in("status", ["published", "sold"])
       .order("created_at", { ascending: false });
 
     if (error) return;
@@ -31,7 +31,7 @@ function Feed() {
     const { data: storeProducts, error: storeProductsError } = await supabase
       .from("store_products")
       .select("*, stores(name, city, logo_url, owner_id, status)")
-      .eq("status", "active")
+      .in("status", ["active", "sold"])
       .order("created_at", { ascending: false });
 
     if (storeProductsError) return;
@@ -56,17 +56,22 @@ function Feed() {
       };
     });
 
-    const commercialPosts = (storeProducts || []).map((product) => ({
+    const commercialPosts = (storeProducts || [])
+      .filter((product) => product.stores?.status === "verified")
+      .map((product) => ({
       id: `store-product-${product.id}`,
       store_product_id: product.id,
+      store_id: product.store_id,
       author_id: product.stores?.owner_id,
       body: product.description || product.title,
       title: product.title,
       price: product.price,
       category: product.category || "oferta",
       image_url: product.image_url,
+      status: product.status,
       created_at: product.created_at,
       is_store_publication: true,
+      is_verified_store: product.stores?.status === "verified",
       profiles: {
         full_name: product.stores?.name || "Loja parceira",
         city: product.city || product.stores?.city,
@@ -80,6 +85,10 @@ function Feed() {
 
   useEffect(() => {
     getCurrentSession().then(({ session: currentSession, profile: currentProfile }) => {
+      if (currentProfile?.account_type === "store") {
+        window.location.href = "/lojas?view=manage";
+        return;
+      }
       setSession(currentSession);
       setProfile(currentProfile);
       fetchPosts(currentSession);
@@ -157,6 +166,74 @@ function Feed() {
       reason: "Conteudo fora da proposta do materniaClub",
     });
     alert("Denuncia enviada para o painel admin.");
+  }
+
+  async function reportStoreProduct(post) {
+    if (!supabase || !session?.user) {
+      alert("Faca login para denunciar ofertas.");
+      return;
+    }
+
+    await supabase.from("reports").insert({
+      reporter_id: session.user.id,
+      target_type: "store_product",
+      target_id: post.store_product_id,
+      reason: "Oferta de loja suspeita ou fora da proposta do materniaClub",
+    });
+    alert("Denuncia enviada para o painel admin.");
+  }
+
+  async function startStoreConversation(post) {
+    if (!supabase || !session?.user) {
+      alert("Faca login para comprar produtos das lojas.");
+      return;
+    }
+
+    if (post.author_id === session.user.id) {
+      alert("Voce esta administrando esta loja.");
+      return;
+    }
+
+    try {
+      await ensureUserProfile(session.user);
+
+      const { data: existingConversation, error: existingError } = await supabase
+        .from("conversations")
+        .select("*")
+        .eq("store_product_id", post.store_product_id)
+        .eq("buyer_id", session.user.id)
+        .eq("seller_id", post.author_id)
+        .maybeSingle();
+
+      if (existingError) throw existingError;
+
+      let conversation = existingConversation;
+
+      if (!conversation) {
+        const { data: createdConversation, error } = await supabase
+          .from("conversations")
+          .insert({
+            store_product_id: post.store_product_id,
+            buyer_id: session.user.id,
+            seller_id: post.author_id,
+          })
+          .select()
+          .maybeSingle();
+
+        if (error) throw error;
+        conversation = createdConversation;
+      }
+
+      await supabase.from("messages").insert({
+        conversation_id: conversation.id,
+        sender_id: session.user.id,
+        body: `Quero comprar na loja: ${post.title || post.body}`,
+      });
+
+      window.location.href = `/chat?conversation=${conversation.id}`;
+    } catch (error) {
+      alert(error.message);
+    }
   }
 
   async function toggleLike(post) {
@@ -258,6 +335,38 @@ function Feed() {
     setPosts((current) => current.filter((item) => item.id !== post.id));
   }
 
+  async function updatePostStatus(post, status) {
+    if (!supabase || !session?.user || post.author_id !== session.user.id) return;
+
+    const { error } = await supabase
+      .from("posts")
+      .update({ status })
+      .eq("id", post.id)
+      .eq("author_id", session.user.id);
+
+    if (error) {
+      if (error.message?.includes("status")) {
+        alert("Para marcar publicacoes do Feed como vendidas, rode o SQL feed-sold-update.sql no Supabase.");
+        return;
+      }
+      return alert(error.message);
+    }
+
+    setPosts((current) => current.map((item) => (item.id === post.id ? { ...item, status } : item)));
+  }
+
+  async function updateStoreProductStatus(post, status) {
+    if (!supabase || !session?.user || post.author_id !== session.user.id || !post.store_product_id) return;
+
+    const { error } = await supabase
+      .from("store_products")
+      .update({ status })
+      .eq("id", post.store_product_id);
+
+    if (error) return alert(error.message);
+    setPosts((current) => current.map((item) => (item.id === post.id ? { ...item, status } : item)));
+  }
+
   return (
     <div className="page-shell feed-layout">
       <section className="content-column">
@@ -308,8 +417,10 @@ function Feed() {
             post={post}
             onDelete={post.is_store_publication ? null : deletePost}
             onLike={post.is_store_publication ? null : toggleLike}
-            onReport={post.is_store_publication ? null : reportPost}
+            onInterest={post.is_store_publication ? startStoreConversation : null}
+            onReport={post.is_store_publication ? reportStoreProduct : reportPost}
             onUpdate={post.is_store_publication ? null : updatePost}
+            onStatusChange={post.is_store_publication ? updateStoreProductStatus : updatePostStatus}
           />
         ))}
       </section>

@@ -80,15 +80,15 @@ function Navbar() {
       </Link>
 
       <nav className="nav-links" aria-label="Navegacao principal">
-        <NavLink to="/">Feed</NavLink>
-        <NavLink to="/marketplace">Marketplace</NavLink>
+        {account?.accountType !== "store" && <NavLink to="/">Feed</NavLink>}
+        {account?.accountType !== "store" && <NavLink to="/marketplace">Marketplace</NavLink>}
         <NavLink to="/lojas">Lojas</NavLink>
-        <NavLink to="/amigos">Amigos</NavLink>
+        {account?.accountType !== "store" && <NavLink to="/amigos">Amigos</NavLink>}
         <NavLink className="chat-nav-link" to="/chat">
           Chat
           {account && unreadCount > 0 && <span className="unread-badge" aria-label={`${unreadCount} mensagens nao lidas`}>{unreadCount}</span>}
         </NavLink>
-        {account && <NavLink to="/perfil">Perfil</NavLink>}
+        {account && account.accountType !== "store" && <NavLink to="/perfil">Perfil</NavLink>}
         {["admin", "moderator"].includes(account?.role) && <NavLink to="/admin">Admin</NavLink>}
       </nav>
 

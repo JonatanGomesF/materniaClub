@@ -76,7 +76,7 @@ function Marketplace() {
     const { data, error } = await supabase
       .from("products")
       .select("*, profiles(full_name)")
-      .eq("status", "active")
+      .in("status", ["active", "sold"])
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -116,6 +116,10 @@ function Marketplace() {
 
   useEffect(() => {
     getCurrentSession().then(({ session: currentSession, profile: currentProfile }) => {
+      if (currentProfile?.account_type === "store") {
+        window.location.href = "/lojas?view=manage";
+        return;
+      }
       setSession(currentSession);
       setProfile(currentProfile);
     });
@@ -298,6 +302,19 @@ function Marketplace() {
     setProducts((current) => current.filter((item) => item.id !== product.id));
   }
 
+  async function updateProductStatus(product, status) {
+    if (!supabase || !session?.user || product.seller_id !== session.user.id) return;
+
+    const { error } = await supabase
+      .from("products")
+      .update({ status })
+      .eq("id", product.id)
+      .eq("seller_id", session.user.id);
+
+    if (error) return alert(error.message);
+    setProducts((current) => current.map((item) => (item.id === product.id ? { ...item, status } : item)));
+  }
+
   async function reportProduct(product) {
     if (!supabase || !session?.user) {
       alert("Faca login para denunciar anuncios.");
@@ -395,6 +412,7 @@ function Marketplace() {
                 onInterest={startConversation}
                 onLike={toggleLike}
                 onReport={reportProduct}
+                onStatusChange={updateProductStatus}
               />
             ))}
           </div>

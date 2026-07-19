@@ -1,0 +1,87 @@
+materniaClub - Visao geral
+==========================
+
+Nome do produto
+---------------
+materniaClub
+
+Proposta
+--------
+Criar uma comunidade digital para maes, gestantes e lojas infantis, unindo:
+- feed social para duvidas, dicas, promocoes e fotos;
+- marketplace entre maes para desapegos e produtos infantis;
+- vitrine de lojas parceiras verificadas;
+- chat para negociacao entre usuarias e entre usuaria e loja;
+- painel admin para moderacao, verificacao de lojas e seguranca.
+
+Problema que o produto resolve
+------------------------------
+Maes e gestantes procuram produtos infantis com preco melhor, mas hoje precisam
+garimpar em muitos grupos, redes sociais e lojas diferentes. O materniaClub
+centraliza achados, desapegos, ofertas e conversas em um ambiente mais focado,
+com regras claras e moderacao.
+
+Publico-alvo
+------------
+1. Maes que querem comprar produtos infantis com preco melhor.
+2. Gestantes que estao montando enxoval.
+3. Maes que querem vender ou doar produtos que o bebe nao usa mais.
+4. Lojas infantis locais que querem divulgar ofertas para maes.
+5. Administrador da plataforma, responsavel por moderacao e verificacao.
+
+Modulos principais
+------------------
+Feed
+- Publicacoes sociais de maes.
+- Texto, imagem, categoria e valor opcional.
+- Curtidas, comentarios, denuncia, edicao por ate 5 minutos e exclusao.
+- Produtos comerciais de lojas verificadas podem aparecer como "Oferta de loja".
+
+Marketplace
+- Anuncios de maes/usuarias comuns.
+- Produtos infantis usados, seminovos ou novos.
+- Distancia aproximada quando houver localizacao.
+- Curtir, comentar, denunciar, excluir e marcar como vendido.
+- Botao "Tenho interesse" abre chat com a anunciante.
+
+Lojas
+- Area publica com vitrines de lojas verificadas.
+- Area privada "Minha loja" para conta de loja.
+- Loja cadastra dados, CNPJ, logo, capa e produtos.
+- Produto pode ser marcado como vendido e liberado novamente.
+- Produto vendido aparece acinzentado e como "Nao disponivel".
+
+Chat
+- Conversas entre comprador e vendedor.
+- Conversas podem estar ligadas a produto de mae ou produto de loja.
+- Apenas participantes devem acessar a conversa.
+
+Admin
+- Aprova/verifica lojas.
+- Suspende ou recusa lojas.
+- Bana ou reativa usuarios.
+- Analisa denuncias.
+- Deve controlar status sensiveis.
+
+Tipos de conta
+--------------
+Mae / usuaria
+- Usa Feed, Marketplace, Lojas, Amigos, Chat e Perfil.
+- Pode postar, anunciar, curtir, comentar e comprar.
+- Nao administra loja.
+
+Loja
+- Usa Lojas, Minha loja e Chat.
+- Pode cadastrar vitrine e produtos.
+- Nao usa Perfil de mae, Amigos, Feed de mae ou Marketplace de mae.
+- Precisa ser verificada para aparecer publicamente.
+
+Admin
+- Conta com role admin.
+- Pode aprovar lojas, suspender, recusar, moderar denuncias e banir usuarios.
+
+Principio de produto
+--------------------
+Separar claramente o que e social de maes e o que e comercial de lojas.
+Isso evita confusao, aumenta seguranca e da mais confianca ao selo "Loja verificada".
+

@@ -8,7 +8,7 @@ create table if not exists public.stores (
   city text,
   description text,
   logo_url text,
-  status text not null default 'active' check (status in ('active', 'hidden', 'removed')),
+  status text not null default 'pending' check (status in ('pending', 'verified', 'rejected', 'suspended', 'hidden', 'removed')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (owner_id)
@@ -49,7 +49,7 @@ create table if not exists public.store_products (
   category text not null,
   city text,
   image_url text,
-  status text not null default 'active' check (status in ('active', 'hidden', 'removed')),
+  status text not null default 'active' check (status in ('active', 'sold', 'hidden', 'removed')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -66,13 +66,13 @@ drop policy if exists "store products owner insert" on public.store_products;
 drop policy if exists "store products owner update" on public.store_products;
 drop policy if exists "store products owner delete" on public.store_products;
 
-create policy "stores public read" on public.stores for select using (status = 'active' or owner_id = auth.uid() or public.is_admin());
+create policy "stores public read" on public.stores for select using (status = 'verified' or owner_id = auth.uid() or public.is_admin());
 create policy "stores owner insert" on public.stores for insert with check (auth.uid() = owner_id);
 create policy "stores owner update" on public.stores for update using (auth.uid() = owner_id or public.is_admin()) with check (auth.uid() = owner_id or public.is_admin());
 create policy "stores owner delete" on public.stores for delete using (auth.uid() = owner_id or public.is_admin());
 
 create policy "store products public read" on public.store_products for select using (
-  status = 'active'
+  status in ('active', 'sold')
   or exists (select 1 from public.stores s where s.id = store_id and s.owner_id = auth.uid())
   or public.is_admin()
 );

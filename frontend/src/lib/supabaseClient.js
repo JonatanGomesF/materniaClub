@@ -25,29 +25,6 @@ export async function getCurrentSession() {
 
   let profile = loadedProfile;
 
-  // A loja pode ter sido criada antes de o perfil ser sincronizado, ou por uma
-  // versao antiga do login que redefinia account_type para "user". A relacao de
-  // propriedade da loja e a fonte mais confiavel para recuperar esse acesso.
-  if (profile && profile.account_type !== "store") {
-    const { data: ownedStore } = await supabase
-      .from("stores")
-      .select("id")
-      .eq("owner_id", session.user.id)
-      .maybeSingle();
-
-    if (ownedStore) {
-      const { data: repairedProfile, error } = await supabase
-        .from("profiles")
-        .update({ account_type: "store" })
-        .eq("id", session.user.id)
-        .select()
-        .maybeSingle();
-
-      if (!error && repairedProfile) profile = repairedProfile;
-      else profile = { ...profile, account_type: "store" };
-    }
-  }
-
   return { session, profile };
 }
 
@@ -86,7 +63,7 @@ export async function ensureUserProfile(user, fallback = {}) {
   // login comum. Atualizamos apenas os campos explicitamente fornecidos.
   if (existingProfile) {
     const updates = {};
-    for (const field of ["full_name", "city", "motherhood_stage", "account_type", "role", "status"]) {
+    for (const field of ["full_name", "city", "motherhood_stage"]) {
       if (fallback[field] !== undefined) updates[field] = fallback[field];
     }
 

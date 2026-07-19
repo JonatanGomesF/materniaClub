@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getCurrentSession, supabase, uploadMedia } from "../lib/supabaseClient";
 
 function Perfil() {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [form, setForm] = useState({ full_name: "", city: "", bio: "", motherhood_stage: "gestante", avatar_url: "" });
   const [avatarFile, setAvatarFile] = useState(null);
@@ -9,6 +11,11 @@ function Perfil() {
 
   useEffect(() => {
     getCurrentSession().then(({ profile: currentProfile }) => {
+      if (currentProfile?.account_type === "store") {
+        navigate("/lojas", { replace: true });
+        return;
+      }
+
       setProfile(currentProfile);
       if (currentProfile) {
         setForm({
@@ -20,7 +27,7 @@ function Perfil() {
         });
       }
     });
-  }, []);
+  }, [navigate]);
 
   function updateField(event) {
     setForm((current) => ({ ...current, [event.target.name]: event.target.value }));

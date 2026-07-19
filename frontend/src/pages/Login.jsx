@@ -58,7 +58,9 @@ function Login() {
           password: form.password,
         });
         if (error) throw error;
-        await ensureUserProfile(data.user);
+        const profile = await ensureUserProfile(data.user);
+        window.location.href = profile?.account_type === "store" ? "/lojas?view=manage" : "/";
+        return;
       } else {
         const isStore = form.account_type === "store";
         const cnpj = form.cnpj.replace(/\D/g, "");

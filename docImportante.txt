@@ -13,7 +13,9 @@ Atualmente o usuário pode atualizar o próprio perfil, incluindo campos sensív
 account_type
 role
 status
-Uma pessoa com conhecimento técnico pode tentar se transformar em loja ou administrador diretamente pelo Supabase. Esses campos precisam ser alterados somente por funções seguras do banco ou por administradores.
+Uma pessoa com conhecimento técnico pode tentar se transformar em loja ou administrador
+ diretamente pelo Supabase. Esses campos precisam ser alterados somente por funções seguras
+  do banco ou por administradores.
 Restringir criação de lojas e produtos
 O banco deve confirmar que:
 O proprietário realmente possui uma conta de loja.

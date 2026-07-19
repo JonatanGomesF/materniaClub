@@ -21,7 +21,11 @@ function Amigos() {
   }
 
   useEffect(() => {
-    getCurrentSession().then(({ session }) => {
+    getCurrentSession().then(({ session, profile }) => {
+      if (profile?.account_type === "store") {
+        window.location.href = "/lojas?view=manage";
+        return;
+      }
       const id = session?.user?.id || null;
       setUserId(id);
       if (id) loadFriendships(id);

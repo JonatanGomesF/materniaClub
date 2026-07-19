@@ -4,11 +4,11 @@
 alter table public.stores drop constraint if exists stores_status_check;
 alter table public.stores
   add constraint stores_status_check
-  check (status in ('pending', 'active', 'rejected', 'hidden', 'removed'));
+  check (status in ('pending', 'verified', 'rejected', 'suspended', 'hidden', 'removed'));
 
 alter table public.stores alter column status set default 'pending';
 
--- Cadastros antigos continuam ativos; somente novos cadastros entram em analise.
+-- Cadastros antigos aprovados devem ser migrados para verified.
 
 create or replace function public.handle_new_maternia_user()
 returns trigger
@@ -52,7 +52,7 @@ create trigger on_auth_user_created_maternia
 drop policy if exists "stores public read" on public.stores;
 drop policy if exists "stores approved or related read" on public.stores;
 create policy "stores approved or related read" on public.stores for select using (
-  status = 'active' or owner_id = auth.uid() or public.is_admin()
+  status = 'verified' or owner_id = auth.uid() or public.is_admin()
 );
 
 drop policy if exists "stores owner insert" on public.stores;
@@ -91,7 +91,7 @@ drop policy if exists "approved store products owner insert" on public.store_pro
 create policy "approved store products owner insert" on public.store_products for insert with check (
   exists (
     select 1 from public.stores s
-    where s.id = store_id and s.owner_id = auth.uid() and s.status = 'active'
+    where s.id = store_id and s.owner_id = auth.uid() and s.status = 'verified'
   )
 );
 

@@ -1,0 +1,199 @@
+materniaClub - Diagramas de sequencia
+=====================================
+
+Observacao
+----------
+Os diagramas estao em Mermaid dentro deste TXT.
+
+
+1. Cadastro de mae
+------------------
+```mermaid
+sequenceDiagram
+  actor Mae
+  participant Frontend
+  participant SupabaseAuth
+  participant Profiles
+
+  Mae->>Frontend: Preenche cadastro como Mae
+  Frontend->>SupabaseAuth: signUp(email, senha, metadata)
+  SupabaseAuth-->>Frontend: usuario criado
+  Frontend->>Profiles: ensureUserProfile(user, dados)
+  Profiles-->>Frontend: profile account_type=user
+  Frontend-->>Mae: Entra no app / Feed
+```
+
+
+2. Cadastro de loja pendente
+----------------------------
+```mermaid
+sequenceDiagram
+  actor Loja
+  participant Frontend
+  participant SupabaseAuth
+  participant Profiles
+  participant Stores
+
+  Loja->>Frontend: Preenche nome, CNPJ, cidade, email e senha
+  Frontend->>SupabaseAuth: signUp(account_type=store)
+  SupabaseAuth-->>Frontend: usuario criado
+  Frontend->>Profiles: Cria profile account_type=store
+  Frontend->>Stores: Cria store status=pending
+  Stores-->>Frontend: Loja aguardando verificacao
+  Frontend-->>Loja: Mostra Minha loja em modo pendente
+```
+
+
+3. Admin verifica loja
+----------------------
+```mermaid
+sequenceDiagram
+  actor Admin
+  participant FrontendAdmin
+  participant Stores
+  participant RLS
+
+  Admin->>FrontendAdmin: Clica Verificar
+  FrontendAdmin->>Stores: update status=verified
+  Stores->>RLS: Confirma role admin
+  RLS-->>Stores: Permitido
+  Stores-->>FrontendAdmin: Loja atualizada
+  FrontendAdmin-->>Admin: Mostra status verificada
+```
+
+
+4. Loja publica produto
+-----------------------
+```mermaid
+sequenceDiagram
+  actor Loja
+  participant Frontend
+  participant Storage
+  participant StoreProducts
+  participant RLS
+
+  Loja->>Frontend: Preenche produto e foto
+  Frontend->>Storage: Upload imagem
+  Storage-->>Frontend: URL publica
+  Frontend->>StoreProducts: insert produto
+  StoreProducts->>RLS: Loja pertence ao usuario? Loja verificada?
+  RLS-->>StoreProducts: Permitido
+  StoreProducts-->>Frontend: Produto criado
+  Frontend-->>Loja: Produto aparece em Minhas publicacoes
+```
+
+
+5. Produto de loja aparece no Feed
+----------------------------------
+```mermaid
+sequenceDiagram
+  actor Mae
+  participant Feed
+  participant StoreProducts
+  participant Stores
+
+  Mae->>Feed: Abre Feed
+  Feed->>StoreProducts: Busca produtos active/sold
+  StoreProducts->>Stores: Confere lojas related
+  Stores-->>Feed: Somente lojas verified
+  Feed-->>Mae: Mostra Oferta de loja / Patrocinado
+```
+
+
+6. Mae compra produto de loja pelo Feed
+---------------------------------------
+```mermaid
+sequenceDiagram
+  actor Mae
+  participant Feed
+  participant Conversations
+  participant Messages
+  participant Chat
+  actor Loja
+
+  Mae->>Feed: Clica Comprar
+  Feed->>Conversations: Busca conversa existente
+  alt nao existe
+    Feed->>Conversations: Cria conversa store_product_id
+  end
+  Feed->>Messages: Envia mensagem inicial
+  Feed-->>Chat: Redireciona para conversa
+  Chat-->>Loja: Loja ve mensagem no chat
+```
+
+
+7. Mae anuncia no Marketplace
+-----------------------------
+```mermaid
+sequenceDiagram
+  actor Mae
+  participant Marketplace
+  participant BrowserLocation
+  participant Storage
+  participant Products
+
+  Mae->>Marketplace: Preenche anuncio
+  Marketplace->>BrowserLocation: Pede localizacao
+  BrowserLocation-->>Marketplace: latitude/longitude
+  Marketplace->>Storage: Upload foto
+  Storage-->>Marketplace: URL da imagem
+  Marketplace->>Products: insert produto seller_id=mae
+  Products-->>Marketplace: Anuncio criado
+  Marketplace-->>Mae: Produto aparece no Marketplace
+```
+
+
+8. Compra no Marketplace
+------------------------
+```mermaid
+sequenceDiagram
+  actor Compradora
+  participant Marketplace
+  participant Conversations
+  participant Messages
+  actor Vendedora
+
+  Compradora->>Marketplace: Clica Tenho interesse
+  Marketplace->>Conversations: Busca conversa product_id
+  alt conversa nao existe
+    Marketplace->>Conversations: Cria conversa
+  end
+  Marketplace->>Messages: Envia mensagem inicial
+  Marketplace-->>Compradora: Abre Chat
+  Messages-->>Vendedora: Mensagem disponivel
+```
+
+
+9. Marcar produto como vendido
+------------------------------
+```mermaid
+sequenceDiagram
+  actor Dono
+  participant Card
+  participant Banco
+  participant OutrosUsuarios
+
+  Dono->>Card: Clica Marcar vendido
+  Card->>Banco: update status=sold
+  Banco-->>Card: OK
+  Card-->>OutrosUsuarios: Produto aparece cinza
+  OutrosUsuarios-->>OutrosUsuarios: Botao Comprar fica bloqueado
+```
+
+
+10. Denuncia de conteudo
+------------------------
+```mermaid
+sequenceDiagram
+  actor Usuario
+  participant App
+  participant Reports
+  actor Admin
+
+  Usuario->>App: Clica Denunciar
+  App->>Reports: insert target_type, target_id, reason
+  Reports-->>App: Denuncia aberta
+  Admin->>Reports: Visualiza denuncias
+  Admin->>Reports: Marca como resolved/dismissed
+```
+

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import ProdutoCard from "../components/ProdutoCard";
 import { ensureUserProfile, getCurrentSession, supabase, uploadMedia } from "../lib/supabaseClient";
 
@@ -30,6 +30,7 @@ const emptyProduct = {
 };
 
 function Lojas() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [stores, setStores] = useState([]);
@@ -37,7 +38,7 @@ function Lojas() {
   const [storeProducts, setStoreProducts] = useState([]);
   const [myProducts, setMyProducts] = useState([]);
   const [selectedStore, setSelectedStore] = useState(null);
-  const [activeView, setActiveView] = useState("showcase");
+  const [activeView, setActiveView] = useState(() => searchParams.get("view") === "manage" ? "manage" : "showcase");
   const [storeForm, setStoreForm] = useState(emptyStore);
   const [storeAccess, setStoreAccess] = useState(emptyStoreAccess);
   const [productForm, setProductForm] = useState(emptyProduct);
@@ -53,18 +54,31 @@ function Lojas() {
     const { data: storeRows } = await supabase
       .from("stores")
       .select("*")
-      .eq("status", "active")
+      .eq("status", "verified")
       .order("created_at", { ascending: false });
 
-    setStores(storeRows || []);
+    const visibleStores = storeRows || [];
+    setStores(visibleStores);
 
     const { data: productRows } = await supabase
       .from("store_products")
-      .select("*, stores(name, city, owner_id)")
-      .eq("status", "active")
+      .select("*, stores(name, city, owner_id, logo_url, status)")
+      .in("status", ["active", "sold"])
       .order("created_at", { ascending: false });
 
-    setStoreProducts(productRows || []);
+    const visibleProducts = (productRows || []).filter((product) => product.stores?.status === "verified");
+    setStoreProducts(visibleProducts);
+
+    const requestedStoreId = searchParams.get("store");
+    const requestedProductId = searchParams.get("produto");
+    if (requestedStoreId) {
+      const storeFromUrl = visibleStores.find((item) => item.id === requestedStoreId)
+        || visibleStores.find((item) => visibleProducts.some((product) => product.id === requestedProductId && product.store_id === item.id));
+      if (storeFromUrl) {
+        setSelectedStore(storeFromUrl);
+        setActiveView("showcase");
+      }
+    }
 
     if (!currentSession?.user || currentProfile?.account_type !== "store") {
       setStore(null);
@@ -98,7 +112,7 @@ function Lojas() {
 
       setMyProducts(mine || []);
     }
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     async function load() {
@@ -131,7 +145,7 @@ function Lojas() {
 
     setSaving(true);
     try {
-      await ensureUserProfile(session.user, { account_type: "store", full_name: storeForm.name.trim(), city: storeForm.city.trim() });
+      await ensureUserProfile(session.user, { full_name: storeForm.name.trim(), city: storeForm.city.trim() });
       const logoUrl = logoFile ? await uploadMedia(logoFile, "store-logos") : storeForm.logo_url || null;
       const coverUrl = coverFile ? await uploadMedia(coverFile, "store-covers") : storeForm.cover_url || null;
 
@@ -225,7 +239,7 @@ function Lojas() {
   async function saveProduct(event) {
     event.preventDefault();
     if (!supabase || !session?.user || !store) return alert("Cadastre sua loja antes de publicar produtos.");
-    if (store.status !== "active") return alert("Sua loja ainda esta em analise e nao pode publicar produtos.");
+    if (store.status !== "verified") return alert("Sua loja precisa ser verificada pelo admin antes de publicar produtos.");
     if (!productForm.title.trim() || !productForm.price) return alert("Informe nome e preco do produto.");
 
     setSaving(true);
@@ -239,7 +253,7 @@ function Lojas() {
         category: productForm.category,
         city: productForm.city.trim() || store.city,
         image_url: imageUrl,
-        status: "active",
+        status: editingProduct?.status || "active",
       };
 
       const { error } = editingProduct
@@ -373,7 +387,7 @@ function Lojas() {
   const activeStoresCount = stores.length;
   const visibleProductsCount = selectedStore ? selectedStoreProducts.length : activeProductsCount;
   const storeMetrics = [
-    { label: "Lojas ativas", value: activeStoresCount },
+    { label: "Lojas verificadas", value: activeStoresCount },
     { label: "Produtos na vitrine", value: activeProductsCount },
     { label: "Vitrine aberta", value: selectedStore ? selectedStore.name : "Todas" },
   ];
@@ -381,6 +395,7 @@ function Lojas() {
   function openShowcase() {
     setActiveView("showcase");
     setSelectedStore(null);
+    setSearchParams({});
   }
 
   return (
@@ -397,7 +412,6 @@ function Lojas() {
           {profile?.account_type === "store" && (
             <button className={activeView === "manage" ? "active" : ""} onClick={() => setActiveView("manage")}>Minha loja</button>
           )}
-          <Link to="/marketplace">Marketplace</Link>
           <Link to="/chat">Chat</Link>
         </nav>
         <div className="stores-side-note">
@@ -455,8 +469,9 @@ function Lojas() {
             </div>
           ) : (
             <>
-              {store?.status === "pending" && <p className="notice">Cadastro recebido. Sua loja esta em analise e sera liberada apos a aprovacao.</p>}
+              {store?.status === "pending" && <p className="notice">Cadastro recebido. Sua loja esta aguardando verificacao do admin. O selo verde e a publicacao no Feed so aparecem apos aprovacao.</p>}
               {store?.status === "rejected" && <p className="notice">O cadastro desta loja nao foi aprovado. Entre em contato com a administracao para revisar os dados.</p>}
+              {store?.status === "suspended" && <p className="notice">Esta loja esta suspensa e nao pode publicar produtos no momento.</p>}
               <form className="listing-form" onSubmit={saveStore}>
                 <h2>{store ? "Dados da loja" : "Cadastrar minha loja"}</h2>
                 <div className="store-media-editor">
@@ -478,7 +493,7 @@ function Lojas() {
                 <button className="primary-button" disabled={saving}>{saving ? "Salvando..." : store ? "Salvar loja" : "Criar loja"}</button>
               </form>
 
-              {store?.status === "active" ? (
+              {store?.status === "verified" ? (
                 <>
                   <form className="listing-form" onSubmit={saveProduct}>
                     <h2>{editingProduct ? "Editar produto" : "Cadastrar produto na vitrine"}</h2>
@@ -526,8 +541,11 @@ function Lojas() {
                       </div>
                     </div>
                     <span>{Number(product.price).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>
-                    <span className="tag">{product.status}</span>
+                    <span className="tag">{product.status === "sold" ? "vendido" : product.status}</span>
                     <button className="soft-button small" onClick={() => startEdit(product)}>Editar</button>
+                        <button className="soft-button small" onClick={() => updateProductStatus(product, product.status === "sold" ? "active" : "sold")}>
+                          {product.status === "sold" ? "Liberar venda" : "Marcar vendido"}
+                        </button>
                         <button className="ghost-button small" onClick={() => updateProductStatus(product, "hidden")}>Remover da vitrine</button>
                         <button className="danger-button small" onClick={() => deleteProduct(product)}>Excluir</button>
                       </div>
@@ -535,7 +553,7 @@ function Lojas() {
                   </div>
                 </>
               ) : store ? (
-                <p className="notice">Os produtos serao liberados quando a loja for aprovada.</p>
+                <p className="notice">Os produtos serao liberados quando a loja for verificada.</p>
               ) : (
                 <p className="notice">Depois de criar a loja, o cadastro de produtos aparece aqui automaticamente.</p>
               )}
@@ -560,7 +578,10 @@ function Lojas() {
                   {stores.map((storeItem) => {
                     const productCount = getStoreProductCount(storeItem);
                     return (
-                      <button className="store-front-card" key={storeItem.id} onClick={() => setSelectedStore(storeItem)}>
+                      <button className="store-front-card" key={storeItem.id} onClick={() => {
+                        setSelectedStore(storeItem);
+                        setSearchParams({ store: storeItem.id });
+                      }}>
                         {storeItem.cover_url && (
                           <div className="store-front-cover">
                             <img src={storeItem.cover_url} alt="" />
@@ -593,7 +614,7 @@ function Lojas() {
                   <p>{selectedStore.description || "Produtos, promocoes e artigos infantis desta loja."}</p>
                   <small>{selectedStore.city || "Cidade nao informada"}</small>
                 </div>
-                <button className="soft-button" onClick={() => setSelectedStore(null)}>Voltar para lojas</button>
+                <button className="soft-button" onClick={openShowcase}>Voltar para lojas</button>
               </div>
 
               {publicProducts.length === 0 ? (
@@ -607,6 +628,7 @@ function Lojas() {
                       currentUserId={session?.user?.id}
                       interestLabel="Comprar"
                       onInterest={startStoreConversation}
+                      onStatusChange={null}
                       profilePath={null}
                     />
                   ))}

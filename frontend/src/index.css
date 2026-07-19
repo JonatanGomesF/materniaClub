@@ -602,6 +602,15 @@ select:focus {
   transform: translateY(-1px);
 }
 
+.primary-button:disabled,
+.soft-button:disabled,
+.ghost-button:disabled,
+.danger-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.64;
+  transform: none;
+}
+
 .small {
   min-height: 36px;
   padding: 8px 13px;
@@ -652,6 +661,25 @@ select:focus {
   height: 15px;
   justify-content: center;
   width: 15px;
+}
+
+.store-offer-badge,
+.store-offer-label {
+  align-items: center;
+  border: 1px solid rgba(232, 79, 145, 0.3);
+  border-radius: 999px;
+  color: #f7bad4;
+  background: rgba(232, 79, 145, 0.12);
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 900;
+  padding: 4px 9px;
+  white-space: nowrap;
+}
+
+.store-offer-label {
+  min-height: 36px;
+  padding: 8px 12px;
 }
 
 .store-product-title { margin: 0 0 6px; }
@@ -818,6 +846,10 @@ select:focus {
   font-weight: 900;
 }
 
+.post-image-wrap {
+  position: relative;
+}
+
 .post-image,
 .product-media img {
   width: 100%;
@@ -828,6 +860,50 @@ select:focus {
 
 .post-image {
   max-height: 560px;
+}
+
+.unavailable-card {
+  border-color: rgba(255, 255, 255, 0.1);
+  filter: grayscale(0.86);
+  opacity: 0.72;
+}
+
+.unavailable-card:hover {
+  transform: none;
+}
+
+.unavailable-card .market-media img,
+.unavailable-card .post-image {
+  filter: grayscale(1) brightness(0.72);
+}
+
+.unavailable-ribbon,
+.unavailable-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(135deg, rgba(43, 43, 48, 0.96), rgba(92, 72, 82, 0.92));
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.26);
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.unavailable-ribbon {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  padding: 8px 12px;
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+}
+
+.unavailable-inline {
+  width: fit-content;
+  margin-bottom: 8px;
+  padding: 7px 11px;
+  font-size: 0.72rem;
 }
 
 .profile-layout,
@@ -1989,6 +2065,21 @@ select:focus {
   border-radius: 8px;
 }
 
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-actions .primary-button,
+.admin-actions .soft-button,
+.admin-actions .ghost-button,
+.admin-actions .danger-button {
+  min-height: 36px;
+  padding: 8px 13px;
+}
+
 /* Tema dashboard escuro aplicado no app inteiro */
 .topbar {
   border-color: rgba(255, 255, 255, 0.08);
@@ -2127,6 +2218,16 @@ select {
 input::placeholder,
 textarea::placeholder {
   color: rgba(255, 255, 255, 0.45);
+}
+
+.unavailable-card,
+.stores-dashboard .market-card.unavailable-card {
+  border-color: rgba(255, 255, 255, 0.1);
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.06), transparent 14rem),
+    rgba(255, 255, 255, 0.035);
+  filter: grayscale(0.86);
+  opacity: 0.72;
 }
 
 select option {

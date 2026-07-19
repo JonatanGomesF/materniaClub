@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import ProductComments from "./ProductComments";
 
-function ProdutoCard({ currentUserId, interestLabel = "Tenho interesse", onDelete, onInterest, onLike, onReport, produto, profilePath, userLocation }) {
+function ProdutoCard({ currentUserId, interestLabel = "Tenho interesse", onDelete, onInterest, onLike, onReport, onStatusChange, produto, profilePath, userLocation }) {
   const navigate = useNavigate();
   const price = Number(produto.price ?? produto.preco ?? 0).toLocaleString("pt-BR", {
     style: "currency",
@@ -9,6 +9,7 @@ function ProdutoCard({ currentUserId, interestLabel = "Tenho interesse", onDelet
   });
   const isOwner = currentUserId && produto.seller_id === currentUserId;
   const likesCount = produto.likes_count || 0;
+  const isUnavailable = produto.status === "sold";
 
   function getDistanceLabel() {
     if (!userLocation || !produto.latitude || !produto.longitude) return null;
@@ -37,7 +38,7 @@ function ProdutoCard({ currentUserId, interestLabel = "Tenho interesse", onDelet
   }
 
   return (
-    <article className="market-card clickable-card" onClick={openProfile}>
+    <article className={isUnavailable ? "market-card clickable-card unavailable-card" : "market-card clickable-card"} onClick={openProfile}>
       <div className="market-media">
         {produto.image_url || produto.imagem ? (
           <img src={produto.image_url || produto.imagem} alt={produto.title || produto.titulo} />
@@ -45,6 +46,7 @@ function ProdutoCard({ currentUserId, interestLabel = "Tenho interesse", onDelet
           <span>Sem foto</span>
         )}
         <span className="market-category">{produto.category || "produto"}</span>
+        {isUnavailable && <span className="unavailable-ribbon">Nao disponivel</span>}
       </div>
 
       <div className="market-info">
@@ -73,10 +75,19 @@ function ProdutoCard({ currentUserId, interestLabel = "Tenho interesse", onDelet
                 {produto.liked_by_me ? "Curtiu" : "Curtir"}
               </button>
             )}
-            {!isOwner && onInterest && <button className="primary-button" onClick={(event) => {
+            {!isOwner && onInterest && !isUnavailable && <button className="primary-button" onClick={(event) => {
               event.stopPropagation();
               onInterest(produto);
             }}>{interestLabel}</button>}
+            {!isOwner && onInterest && isUnavailable && <button className="soft-button" disabled onClick={(event) => event.stopPropagation()}>Nao disponivel</button>}
+            {isOwner && onStatusChange && (
+              <button className="soft-button" onClick={(event) => {
+                event.stopPropagation();
+                onStatusChange(produto, isUnavailable ? "active" : "sold");
+              }}>
+                {isUnavailable ? "Liberar venda" : "Marcar vendido"}
+              </button>
+            )}
             {isOwner && onDelete && <button className="danger-button" onClick={(event) => {
               event.stopPropagation();
               onDelete(produto);
