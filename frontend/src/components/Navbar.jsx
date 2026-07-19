@@ -88,7 +88,7 @@ function Navbar() {
           Chat
           {account && unreadCount > 0 && <span className="unread-badge" aria-label={`${unreadCount} mensagens nao lidas`}>{unreadCount}</span>}
         </NavLink>
-        <NavLink to="/perfil">Perfil</NavLink>
+        {account && <NavLink to="/perfil">Perfil</NavLink>}
         {["admin", "moderator"].includes(account?.role) && <NavLink to="/admin">Admin</NavLink>}
       </nav>
 
@@ -106,7 +106,7 @@ function Navbar() {
             <button className="logout-button" onClick={logout}>Sair</button>
           </div>
         ) : (
-          <Link className="primary-button small" to="/login">Entrar</Link>
+          <Link className="nav-login-button" to="/login">Entrar</Link>
         )}
       </div>
     </header>

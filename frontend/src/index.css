@@ -92,7 +92,7 @@ h3 {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 18px;
+  gap: 12px;
   width: min(1180px, calc(100% - 32px));
   margin: 14px auto 0;
   padding: 12px;
@@ -139,7 +139,7 @@ h3 {
 
 .nav-links {
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
   gap: 6px;
 }
 
@@ -186,20 +186,34 @@ h3 {
 .nav-account {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
+  justify-content: flex-start;
+  gap: 8px;
 }
 
 .account-card {
+  position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  min-width: min(330px, 100%);
-  padding: 7px;
+  gap: 9px;
+  min-width: min(292px, 100%);
+  padding: 6px 6px 6px 8px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: linear-gradient(135deg, #fff, var(--rose-50));
+}
+
+.account-card::after {
+  content: "";
+  position: absolute;
+  right: 58px;
+  top: 9px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #63f2aa;
+  box-shadow: 0 0 0 5px rgba(99, 242, 170, 0.1), 0 0 18px rgba(99, 242, 170, 0.55);
+  animation: livePulse 1.8s ease-in-out infinite;
 }
 
 .account-avatar {
@@ -255,14 +269,68 @@ h3 {
 }
 
 .logout-button {
-  min-height: 34px;
-  border: 0;
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
-  padding: 8px 12px;
+  padding: 8px 14px;
   color: #fff;
-  background: var(--rose-700);
+  background: linear-gradient(135deg, var(--rose-500), var(--rose-700));
+  box-shadow: 0 14px 28px rgba(232, 79, 145, 0.26);
   cursor: pointer;
   font-weight: 900;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.nav-login-button {
+  position: relative;
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 10px 20px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--rose-500), var(--rose-700));
+  box-shadow: 0 16px 34px rgba(232, 79, 145, 0.3);
+  font-size: 0.94rem;
+  font-weight: 950;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.nav-login-button::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.72);
+}
+
+.nav-login-button:hover,
+.logout-button:hover {
+  color: #fff;
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow: 0 20px 40px rgba(232, 79, 145, 0.36);
+}
+
+@keyframes livePulse {
+  0%,
+  100% {
+    opacity: 0.74;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.38);
+  }
 }
 
 .page-shell {
@@ -1944,8 +2012,9 @@ select:focus {
 }
 
 .account-card {
-  border-color: rgba(232, 79, 145, 0.28);
-  background: rgba(255, 255, 255, 0.065);
+  border-color: rgba(232, 79, 145, 0.42);
+  background: linear-gradient(135deg, rgba(232, 79, 145, 0.18), rgba(255, 255, 255, 0.065));
+  box-shadow: 0 14px 30px rgba(232, 79, 145, 0.16);
 }
 
 .account-copy strong {
