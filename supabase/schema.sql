@@ -3,6 +3,7 @@
 -- Ele remove as tabelas do app antigo e cria o modelo social/marketplace/admin.
 
 drop table if exists public.messages cascade;
+drop table if exists public.mother_reviews cascade;
 drop table if exists public.conversations cascade;
 drop table if exists public.friendships cascade;
 drop table if exists public.store_products cascade;
@@ -16,6 +17,8 @@ drop table if exists public.product_likes cascade;
 drop table if exists public.products cascade;
 drop table if exists public.posts cascade;
 drop table if exists public.categories cascade;
+drop table if exists public.maternia_coin_transactions cascade;
+drop table if exists public.maternia_wallets cascade;
 drop table if exists public.profiles cascade;
 
 create extension if not exists "pgcrypto";
@@ -32,6 +35,22 @@ create table public.profiles (
   status text not null default 'active' check (status in ('active', 'suspended', 'banned')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+create table public.maternia_wallets (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  balance integer not null default 10 check (balance >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table public.maternia_coin_transactions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  amount integer not null check (amount <> 0),
+  reason text not null default 'Ajuste administrativo',
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now()
 );
 
 create table public.friendships (
@@ -165,6 +184,23 @@ create table public.conversations (
   unique (store_product_id, buyer_id, seller_id)
 );
 
+create table public.mother_reviews (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references public.conversations(id) on delete cascade,
+  product_id uuid references public.products(id) on delete set null,
+  reviewer_id uuid not null references public.profiles(id) on delete cascade,
+  reviewed_id uuid not null references public.profiles(id) on delete cascade,
+  rating integer not null check (rating between 1 and 5),
+  comment text check (comment is null or char_length(comment) <= 600),
+  status text not null default 'published' check (status in ('published', 'hidden', 'removed')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (conversation_id),
+  check (reviewer_id <> reviewed_id)
+);
+
+create index mother_reviews_reviewed_id_idx on public.mother_reviews (reviewed_id, created_at desc);
+
 create table public.messages (
   id uuid primary key default gen_random_uuid(),
   conversation_id uuid not null references public.conversations(id) on delete cascade,
@@ -197,6 +233,9 @@ $$ language plpgsql;
 create trigger profiles_updated_at before update on public.profiles
 for each row execute function public.set_updated_at();
 
+create trigger maternia_wallets_updated_at before update on public.maternia_wallets
+for each row execute function public.set_updated_at();
+
 create trigger posts_updated_at before update on public.posts
 for each row execute function public.set_updated_at();
 
@@ -209,6 +248,29 @@ for each row execute function public.set_updated_at();
 create trigger store_products_updated_at before update on public.store_products
 for each row execute function public.set_updated_at();
 
+create trigger mother_reviews_updated_at before update on public.mother_reviews
+for each row execute function public.set_updated_at();
+
+create or replace function public.ensure_maternia_wallet()
+returns trigger as $$
+begin
+  if new.account_type = 'user' then
+    insert into public.maternia_wallets (user_id, balance)
+    values (new.id, 10)
+    on conflict (user_id) do nothing;
+  else
+    delete from public.maternia_wallets
+    where user_id = new.id;
+  end if;
+
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+create trigger ensure_maternia_wallet_on_profile
+after insert or update of account_type on public.profiles
+for each row execute function public.ensure_maternia_wallet();
+
 create or replace function public.is_admin()
 returns boolean as $$
   select exists (
@@ -218,6 +280,58 @@ returns boolean as $$
     and status = 'active'
   );
 $$ language sql stable security definer;
+
+create or replace function public.admin_add_maternia_coins(
+  target_user_id uuid,
+  amount_to_add integer,
+  reason_text text default 'Credito manual do admin'
+)
+returns integer as $$
+declare
+  new_balance integer;
+  target_account_type text;
+  target_status text;
+begin
+  if not public.is_admin() then
+    raise exception 'Somente administradores podem adicionar moedas maternia';
+  end if;
+
+  if amount_to_add is null or amount_to_add <= 0 then
+    raise exception 'Informe uma quantidade positiva de moedas';
+  end if;
+
+  select account_type, status
+  into target_account_type, target_status
+  from public.profiles
+  where id = target_user_id;
+
+  if target_account_type is null then
+    raise exception 'Usuaria nao encontrada';
+  end if;
+
+  if target_account_type <> 'user' then
+    raise exception 'Moedas maternia sao exclusivas para maes usuarias';
+  end if;
+
+  if target_status <> 'active' then
+    raise exception 'Nao e possivel adicionar moedas para uma conta inativa';
+  end if;
+
+  insert into public.maternia_wallets (user_id, balance)
+  values (target_user_id, 10)
+  on conflict (user_id) do nothing;
+
+  update public.maternia_wallets
+  set balance = balance + amount_to_add
+  where user_id = target_user_id
+  returning balance into new_balance;
+
+  insert into public.maternia_coin_transactions (user_id, amount, reason, created_by)
+  values (target_user_id, amount_to_add, coalesce(nullif(reason_text, ''), 'Credito manual do admin'), auth.uid());
+
+  return new_balance;
+end;
+$$ language plpgsql security definer set search_path = public;
 
 create or replace function public.protect_profile_sensitive_fields()
 returns trigger as $$
@@ -260,6 +374,8 @@ before update of status on public.stores
 for each row execute function public.protect_store_status();
 
 alter table public.profiles enable row level security;
+alter table public.maternia_wallets enable row level security;
+alter table public.maternia_coin_transactions enable row level security;
 alter table public.categories enable row level security;
 alter table public.posts enable row level security;
 alter table public.products enable row level security;
@@ -270,12 +386,30 @@ alter table public.product_likes enable row level security;
 alter table public.comments enable row level security;
 alter table public.reports enable row level security;
 alter table public.conversations enable row level security;
+alter table public.mother_reviews enable row level security;
 alter table public.messages enable row level security;
 alter table public.friendships enable row level security;
 
 create policy "profiles public read" on public.profiles for select using (status <> 'banned' or public.is_admin());
 create policy "profiles owner insert" on public.profiles for insert with check (auth.uid() = id);
 create policy "profiles owner update" on public.profiles for update using (auth.uid() = id or public.is_admin()) with check (auth.uid() = id or public.is_admin());
+
+create policy "wallets owner or admin read" on public.maternia_wallets for select using (
+  public.is_admin()
+  or (
+    user_id = auth.uid()
+    and exists (select 1 from public.profiles p where p.id = user_id and p.account_type = 'user')
+  )
+);
+create policy "wallets admin write" on public.maternia_wallets for all using (public.is_admin()) with check (public.is_admin());
+create policy "coin transactions owner or admin read" on public.maternia_coin_transactions for select using (
+  public.is_admin()
+  or (
+    user_id = auth.uid()
+    and exists (select 1 from public.profiles p where p.id = user_id and p.account_type = 'user')
+  )
+);
+create policy "coin transactions admin insert" on public.maternia_coin_transactions for insert with check (public.is_admin());
 
 create policy "friendships participants read" on public.friendships for select using (auth.uid() in (requester_id, addressee_id));
 create policy "friendships requester insert" on public.friendships for insert with check (auth.uid() = requester_id and status = 'pending');
@@ -352,6 +486,33 @@ create policy "reports admin update" on public.reports for update using (public.
 create policy "conversations participants" on public.conversations for select using (auth.uid() in (buyer_id, seller_id) or public.is_admin());
 create policy "conversations participant insert" on public.conversations for insert with check (auth.uid() in (buyer_id, seller_id));
 
+create policy "mother reviews public read" on public.mother_reviews for select using (status = 'published' or reviewer_id = auth.uid() or reviewed_id = auth.uid() or public.is_admin());
+create policy "mother reviews buyer insert" on public.mother_reviews for insert with check (
+  auth.uid() = reviewer_id
+  and status = 'published'
+  and exists (
+    select 1
+    from public.conversations c
+    join public.products pr on pr.id = c.product_id
+    join public.profiles buyer on buyer.id = c.buyer_id
+    join public.profiles seller on seller.id = c.seller_id
+    where c.id = conversation_id
+    and c.product_id is not null
+    and c.store_product_id is null
+    and c.product_id = mother_reviews.product_id
+    and c.buyer_id = auth.uid()
+    and c.seller_id = reviewed_id
+    and pr.seller_id = reviewed_id
+    and buyer.account_type = 'user'
+    and seller.account_type = 'user'
+    and buyer.status = 'active'
+    and seller.status = 'active'
+    and exists (select 1 from public.messages m where m.conversation_id = c.id)
+  )
+);
+create policy "mother reviews admin update" on public.mother_reviews for update using (public.is_admin()) with check (public.is_admin());
+create policy "mother reviews admin delete" on public.mother_reviews for delete using (public.is_admin());
+
 create policy "messages participants read" on public.messages for select using (
   exists (
     select 1 from public.conversations c
@@ -384,6 +545,9 @@ create policy "media public read" on storage.objects for select using (bucket_id
 create policy "media authenticated upload" on storage.objects for insert with check (bucket_id = 'maternia-media' and auth.role() = 'authenticated');
 create policy "media owner update" on storage.objects for update using (bucket_id = 'maternia-media' and owner = auth.uid());
 create policy "media owner delete" on storage.objects for delete using (bucket_id = 'maternia-media' and (owner = auth.uid() or public.is_admin()));
+
+revoke all on function public.admin_add_maternia_coins(uuid, integer, text) from public;
+grant execute on function public.admin_add_maternia_coins(uuid, integer, text) to authenticated;
 
 -- Depois que voce criar sua conta, rode isto trocando o email para virar admin:
 -- update public.profiles

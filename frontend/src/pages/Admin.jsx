@@ -9,6 +9,8 @@ function Admin() {
   const [users, setUsers] = useState([]);
   const [reports, setReports] = useState([]);
   const [stores, setStores] = useState([]);
+  const [wallets, setWallets] = useState({});
+  const [coinAmounts, setCoinAmounts] = useState({});
   const [adminMessage, setAdminMessage] = useState("");
 
   useEffect(() => {
@@ -18,17 +20,27 @@ function Admin() {
 
       if (!supabase || currentProfile?.role !== "admin") return;
 
-      const [{ data: profiles }, { data: reportRows }, { data: storeRows }, { count: posts }, { count: products }] = await Promise.all([
+      const [{ data: profiles }, { data: reportRows }, { data: storeRows }, { count: posts }, { count: products }, walletResult] = await Promise.all([
         supabase.from("profiles").select("*").order("created_at", { ascending: false }),
         supabase.from("reports").select("*, reporter:profiles(full_name)").order("created_at", { ascending: false }),
         supabase.from("stores").select("*").order("created_at", { ascending: false }),
         supabase.from("posts").select("*", { count: "exact", head: true }),
         supabase.from("products").select("*", { count: "exact", head: true }),
+        supabase.from("maternia_wallets").select("*"),
       ]);
 
       setUsers(profiles || []);
       setReports(reportRows || []);
       setStores(storeRows || []);
+      setWallets(
+        (walletResult.data || []).reduce((map, wallet) => {
+          map[wallet.user_id] = wallet;
+          return map;
+        }, {})
+      );
+      if (walletResult.error) {
+        setAdminMessage("Para usar moedas maternia, rode o SQL supabase/maternia-coins-update.sql no Supabase.");
+      }
       setStats({
         users: profiles?.length || 0,
         posts: posts || 0,
@@ -44,6 +56,41 @@ function Admin() {
     if (!supabase) return;
     await supabase.from("profiles").update({ status }).eq("id", userId);
     setUsers((current) => current.map((user) => (user.id === userId ? { ...user, status } : user)));
+  }
+
+  async function addCoins(user) {
+    if (!supabase) return;
+    setAdminMessage("");
+
+    if (user.account_type !== "user") {
+      setAdminMessage("Moedas maternia sao exclusivas para maes usuarias.");
+      return;
+    }
+
+    const amount = Number(coinAmounts[user.id]);
+    if (!Number.isInteger(amount) || amount <= 0) {
+      setAdminMessage("Digite uma quantidade inteira e positiva de moedas.");
+      return;
+    }
+
+    const { data, error } = await supabase.rpc("admin_add_maternia_coins", {
+      target_user_id: user.id,
+      amount_to_add: amount,
+      reason_text: "Credito manual do admin",
+    });
+
+    if (error) {
+      setAdminMessage(error.message);
+      return;
+    }
+
+    setWallets((current) => ({
+      ...current,
+      [user.id]: { ...(current[user.id] || { user_id: user.id }), balance: data },
+    }));
+    setCoinAmounts((current) => ({ ...current, [user.id]: "" }));
+    setAdminMessage(`${amount} moedas adicionadas para ${user.full_name}. Saldo atual: ${data}.`);
+    window.dispatchEvent(new Event("maternia-wallet-updated"));
   }
 
   async function closeReport(reportId) {
@@ -199,11 +246,33 @@ function Admin() {
           <div className="admin-row" key={user.id}>
             <div>
               <strong>{user.full_name}</strong>
-              <p>{user.city || "Sem cidade"} · {user.role}</p>
+              <p>{user.city || "Sem cidade"} - {user.role} - {user.account_type === "store" ? "loja" : "mae"}</p>
+            </div>
+            <div className="coin-admin-box">
+              {user.account_type === "store" ? (
+                <span className="tag">sem moedas</span>
+              ) : (
+                <>
+                  <span className="coin-admin-pill">{wallets[user.id]?.balance ?? 0} moedas</span>
+                  <div className="coin-admin-controls">
+                    <input
+                      aria-label={`Adicionar moedas para ${user.full_name}`}
+                      min="1"
+                      placeholder="+ moedas"
+                      type="number"
+                      value={coinAmounts[user.id] || ""}
+                      onChange={(event) => setCoinAmounts((current) => ({ ...current, [user.id]: event.target.value }))}
+                    />
+                    <button className="soft-button" onClick={() => addCoins(user)}>Adicionar</button>
+                  </div>
+                </>
+              )}
             </div>
             <span className="tag">{user.status}</span>
-            <button className="ghost-button" onClick={() => updateUserStatus(user.id, "banned")}>Banir</button>
-            <button className="soft-button" onClick={() => updateUserStatus(user.id, "active")}>Reativar</button>
+            <div className="admin-actions">
+              <button className="ghost-button" onClick={() => updateUserStatus(user.id, "banned")}>Banir</button>
+              <button className="soft-button" onClick={() => updateUserStatus(user.id, "active")}>Reativar</button>
+            </div>
           </div>
         ))}
       </section>

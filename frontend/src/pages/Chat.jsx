@@ -10,6 +10,9 @@ function Chat() {
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState("");
   const [unreadByConversation, setUnreadByConversation] = useState({});
+  const [reviewsByConversation, setReviewsByConversation] = useState({});
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [reviewDraft, setReviewDraft] = useState({ rating: 5, comment: "" });
 
   function getConversationProduct(conversation) {
     return conversation?.products || conversation?.store_products || null;
@@ -23,6 +26,17 @@ function Chat() {
   function getOtherParticipant(conversation) {
     if (!conversation || !session?.user) return null;
     return conversation.buyer_id === session.user.id ? conversation.seller : conversation.buyer;
+  }
+
+  function canReviewConversation(conversation) {
+    return Boolean(
+      session?.user
+      && conversation?.product_id
+      && !conversation.store_product_id
+      && conversation.buyer_id === session.user.id
+      && conversation.seller_id !== session.user.id
+      && conversation.seller?.account_type === "user"
+    );
   }
 
   const markConversationAsRead = useCallback(async (conversationId, userId) => {
@@ -76,6 +90,35 @@ function Chat() {
     }
   }, [markConversationAsRead]);
 
+  const loadReviews = useCallback(async (userId, conversationRows) => {
+    if (!supabase || !userId || conversationRows.length === 0) {
+      setReviewsByConversation({});
+      return;
+    }
+
+    const reviewableIds = conversationRows
+      .filter((conversation) => conversation.buyer_id === userId && conversation.product_id && !conversation.store_product_id)
+      .map((conversation) => conversation.id);
+
+    if (reviewableIds.length === 0) {
+      setReviewsByConversation({});
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("mother_reviews")
+      .select("*")
+      .eq("reviewer_id", userId)
+      .in("conversation_id", reviewableIds);
+
+    if (error) return;
+
+    setReviewsByConversation((data || []).reduce((map, review) => {
+      map[review.conversation_id] = review;
+      return map;
+    }, {}));
+  }, []);
+
   useEffect(() => {
     async function loadChat() {
       const { session: currentSession } = await getCurrentSession();
@@ -84,14 +127,14 @@ function Chat() {
 
       let { data, error } = await supabase
         .from("conversations")
-        .select("*, buyer:profiles!conversations_buyer_id_fkey(id, full_name, avatar_url), seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url), products(title, image_url), store_products(title, image_url, stores(name))")
+        .select("*, buyer:profiles!conversations_buyer_id_fkey(id, full_name, avatar_url, account_type), seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url, account_type), products(title, image_url), store_products(title, image_url, stores(name))")
         .or(`buyer_id.eq.${currentSession.user.id},seller_id.eq.${currentSession.user.id}`)
         .order("created_at", { ascending: false });
 
       if (error) {
         const fallback = await supabase
           .from("conversations")
-          .select("*, buyer:profiles!conversations_buyer_id_fkey(id, full_name, avatar_url), seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url), products(title, image_url)")
+          .select("*, buyer:profiles!conversations_buyer_id_fkey(id, full_name, avatar_url, account_type), seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url, account_type), products(title, image_url)")
           .or(`buyer_id.eq.${currentSession.user.id},seller_id.eq.${currentSession.user.id}`)
           .order("created_at", { ascending: false });
 
@@ -104,6 +147,7 @@ function Chat() {
       const rows = data || [];
       setConversations(rows);
       loadUnreadCounts(currentSession.user.id, rows);
+      loadReviews(currentSession.user.id, rows);
 
       const conversationId = searchParams.get("conversation");
       const selected = rows.find((item) => item.id === conversationId) || rows[0] || null;
@@ -112,7 +156,7 @@ function Chat() {
     }
 
     loadChat();
-  }, [loadMessages, loadUnreadCounts, searchParams]);
+  }, [loadMessages, loadReviews, loadUnreadCounts, searchParams]);
 
   useEffect(() => {
     if (!supabase || !session?.user) return undefined;
@@ -147,6 +191,48 @@ function Chat() {
     setMessage("");
     loadMessages(activeConversation.id, session.user.id);
   }
+
+  async function submitReview(event) {
+    event.preventDefault();
+    if (!supabase || !session?.user || !activeConversation || !canReviewConversation(activeConversation)) return;
+
+    const rating = Number(reviewDraft.rating);
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      alert("Escolha uma nota entre 1 e 5 estrelas.");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("mother_reviews")
+      .insert({
+        conversation_id: activeConversation.id,
+        product_id: activeConversation.product_id,
+        reviewer_id: session.user.id,
+        reviewed_id: activeConversation.seller_id,
+        rating,
+        comment: reviewDraft.comment.trim() || null,
+      })
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      if (error.code === "23505") {
+        alert("Voce ja avaliou essa negociacao.");
+        return;
+      }
+      alert(error.message.includes("mother_reviews")
+        ? "Execute o SQL mother-reviews-update.sql no Supabase para ativar avaliacoes."
+        : error.message);
+      return;
+    }
+
+    setReviewsByConversation((current) => ({ ...current, [activeConversation.id]: data }));
+    setReviewDraft({ rating: 5, comment: "" });
+    setIsReviewOpen(false);
+  }
+
+  const activeReview = activeConversation ? reviewsByConversation[activeConversation.id] : null;
+  const activeCanReview = canReviewConversation(activeConversation);
 
   return (
     <div className="page-shell chat-layout">
@@ -201,6 +287,25 @@ function Chat() {
                 <strong>{getConversationTitle(activeConversation)}</strong>
               </div>
 
+              {activeCanReview && (
+                <div className="review-nudge">
+                  {activeReview ? (
+                    <>
+                      <strong>Voce avaliou essa mamae com {activeReview.rating} estrelas.</strong>
+                      <span>Obrigada por ajudar outras maes a comprarem com mais seguranca.</span>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <strong>O que voce achou dessa mamae?</strong>
+                        <span>Avalie sua negociacao com {activeConversation.seller?.full_name || "essa mamae"}.</span>
+                      </div>
+                      <button className="primary-button small" onClick={() => setIsReviewOpen(true)}>Avaliar</button>
+                    </>
+                  )}
+                </div>
+              )}
+
               <div className="message-list">
                 {messages.map((item) => (
                   <div className={item.sender_id === session?.user?.id ? "message sent" : "message received"} key={item.id}>
@@ -213,6 +318,39 @@ function Chat() {
                 <input placeholder="Escreva uma mensagem" value={message} onChange={(event) => setMessage(event.target.value)} />
                 <button className="primary-button small">Enviar</button>
               </form>
+
+              {isReviewOpen && (
+                <div className="review-modal-backdrop" role="presentation" onClick={() => setIsReviewOpen(false)}>
+                  <form className="review-modal" onClick={(event) => event.stopPropagation()} onSubmit={submitReview}>
+                    <span className="eyebrow">Avaliacao</span>
+                    <h2>O que voce achou dessa mamae?</h2>
+                    <p>Sua avaliacao aparece no perfil dela e ajuda outras maes da comunidade.</p>
+                    <div className="star-picker" aria-label="Nota da avaliacao">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          aria-label={`${star} estrelas`}
+                          className={star <= reviewDraft.rating ? "active" : ""}
+                          key={star}
+                          onClick={() => setReviewDraft((current) => ({ ...current, rating: star }))}
+                          type="button"
+                        >
+                          ★
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      maxLength="600"
+                      placeholder="Conte como foi a negociacao"
+                      value={reviewDraft.comment}
+                      onChange={(event) => setReviewDraft((current) => ({ ...current, comment: event.target.value }))}
+                    />
+                    <div className="review-modal-actions">
+                      <button className="ghost-button" type="button" onClick={() => setIsReviewOpen(false)}>Cancelar</button>
+                      <button className="primary-button" type="submit">Enviar avaliacao</button>
+                    </div>
+                  </form>
+                </div>
+              )}
             </>
           ) : (
             <p className="empty-state">Clique em Tenho interesse em um anuncio para abrir uma conversa.</p>

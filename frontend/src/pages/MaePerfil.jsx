@@ -11,6 +11,7 @@ function MaePerfil() {
   const [stats, setStats] = useState({ posts: 0, activeProducts: 0, soldProducts: 0 });
   const [products, setProducts] = useState([]);
   const [posts, setPosts] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [friendship, setFriendship] = useState(null);
   const [loadedAt] = useState(() => Date.now());
 
@@ -28,6 +29,7 @@ function MaePerfil() {
         { count: soldProductsCount },
         { data: productRows },
         { data: postRows },
+        { data: reviewRows },
       ] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", id).maybeSingle(),
         supabase.from("posts").select("*", { count: "exact", head: true }).eq("author_id", id).eq("status", "published"),
@@ -47,6 +49,13 @@ function MaePerfil() {
           .eq("status", "published")
           .order("created_at", { ascending: false })
           .limit(4),
+        supabase
+          .from("mother_reviews")
+          .select("*, reviewer:profiles!mother_reviews_reviewer_id_fkey(full_name, avatar_url)")
+          .eq("reviewed_id", id)
+          .eq("status", "published")
+          .order("created_at", { ascending: false })
+          .limit(8),
       ]);
 
       setProfile(profileData);
@@ -57,6 +66,7 @@ function MaePerfil() {
       });
       setProducts(productRows || []);
       setPosts(postRows || []);
+      setReviews(reviewRows || []);
 
       if (currentSession?.user && currentSession.user.id !== id) {
         const { data: friendshipData } = await supabase
@@ -121,6 +131,18 @@ function MaePerfil() {
     return <button className="soft-button" onClick={removeFriendship}>Solicitacao enviada</button>;
   }
 
+  function getAverageRating() {
+    if (reviews.length === 0) return null;
+    const total = reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0);
+    return (total / reviews.length).toFixed(1);
+  }
+
+  function renderStars(rating) {
+    return [1, 2, 3, 4, 5].map((star) => (
+      <span className={star <= Number(rating) ? "active" : ""} key={star}>★</span>
+    ));
+  }
+
   if (!profile) {
     return (
       <div className="page-shell">
@@ -164,6 +186,37 @@ function MaePerfil() {
           <span>Publicacoes</span>
           <strong>{stats.posts}</strong>
         </div>
+        <div>
+          <span>Avaliacoes</span>
+          <strong>{getAverageRating() ? `${getAverageRating()} / 5` : "Sem ainda"}</strong>
+        </div>
+      </section>
+
+      <section className="profile-section reviews-section">
+        <div className="section-title-row">
+          <h2>Avaliacoes de outras maes</h2>
+          {reviews.length > 0 && <span className="tag">{reviews.length} avaliacoes</span>}
+        </div>
+        {reviews.length === 0 ? (
+          <p className="empty-state">Essa mae ainda nao recebeu avaliacoes de negociacoes.</p>
+        ) : (
+          <div className="review-list">
+            {reviews.map((review) => (
+              <article className="review-card" key={review.id}>
+                <div className="review-author">
+                  <span className="profile-avatar-small">
+                    {review.reviewer?.avatar_url ? <img src={review.reviewer.avatar_url} alt="" /> : review.reviewer?.full_name?.charAt(0) || "M"}
+                  </span>
+                  <div>
+                    <strong>{review.reviewer?.full_name || "Mae da comunidade"}</strong>
+                    <span className="review-stars">{renderStars(review.rating)}</span>
+                  </div>
+                </div>
+                {review.comment && <p>{review.comment}</p>}
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="profile-section">

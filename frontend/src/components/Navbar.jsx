@@ -5,6 +5,7 @@ import { getCurrentSession, getDisplayUser, isSupabaseConfigured, supabase } fro
 function Navbar() {
   const [account, setAccount] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [wallet, setWallet] = useState({ userId: null, balance: null });
 
   useEffect(() => {
     let mounted = true;
@@ -65,10 +66,44 @@ function Navbar() {
     };
   }, [account?.id]);
 
+  useEffect(() => {
+    if (!supabase || !account?.id || account.accountType !== "user") {
+      return undefined;
+    }
+
+    let mounted = true;
+
+    const loadWallet = async () => {
+      const { data, error } = await supabase
+        .from("maternia_wallets")
+        .select("balance")
+        .eq("user_id", account.id)
+        .maybeSingle();
+
+      if (mounted && !error) setWallet({ userId: account.id, balance: data?.balance ?? 0 });
+    };
+
+    loadWallet();
+    window.addEventListener("maternia-wallet-updated", loadWallet);
+
+    const channel = supabase
+      .channel(`navbar-wallet-${account.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "maternia_wallets", filter: `user_id=eq.${account.id}` }, loadWallet)
+      .subscribe();
+
+    return () => {
+      mounted = false;
+      window.removeEventListener("maternia-wallet-updated", loadWallet);
+      supabase.removeChannel(channel);
+    };
+  }, [account?.id, account?.accountType]);
+
   const logout = async () => {
     if (supabase) await supabase.auth.signOut();
     window.location.href = "/login";
   };
+
+  const visibleWalletBalance = account?.accountType === "user" && wallet.userId === account?.id ? wallet.balance : null;
 
   return (
     <header className="topbar">
@@ -102,6 +137,12 @@ function Navbar() {
             <span className="account-copy">
               <strong>Ola, {account.firstName}</strong>
               <small>{account.email}</small>
+              {visibleWalletBalance !== null && (
+                <span className="coin-balance" title="Suas moedas maternia">
+                  <span>M</span>
+                  {visibleWalletBalance} moedas
+                </span>
+              )}
             </span>
             <button className="logout-button" onClick={logout}>Sair</button>
           </div>
