@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import ProfilePersonalDetails from "../components/ProfilePersonalDetails";
 import ProdutoCard from "../components/ProdutoCard";
 import PostCard from "../components/PostCard";
 import { getCurrentSession, supabase } from "../lib/supabaseClient";
@@ -190,6 +191,13 @@ function MaePerfil() {
           <span>Avaliacoes</span>
           <strong>{getAverageRating() ? `${getAverageRating()} / 5` : "Sem ainda"}</strong>
         </div>
+      </section>
+
+      <section className="profile-section profile-personal-public">
+        <div className="section-title-row">
+          <h2>Dados pessoais</h2>
+        </div>
+        <ProfilePersonalDetails profile={profile} />
       </section>
 
       <section className="profile-section reviews-section">

@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import ProductComments from "./ProductComments";
 
-function ProdutoCard({ currentUserId, interestLabel = "Tenho interesse", onDelete, onInterest, onLike, onReport, onStatusChange, produto, profilePath, userLocation }) {
+function ProdutoCard({ currentUserId, interestLabel = "Tenho interesse", onDelete, onInterest, onLike, onOpenDetails, onReport, onStatusChange, produto, profilePath, userLocation }) {
   const navigate = useNavigate();
   const price = Number(produto.price ?? produto.preco ?? 0).toLocaleString("pt-BR", {
     style: "currency",
@@ -32,6 +32,10 @@ function ProdutoCard({ currentUserId, interestLabel = "Tenho interesse", onDelet
   const distanceLabel = getDistanceLabel();
 
   function openProfile() {
+    if (onOpenDetails) {
+      onOpenDetails(produto);
+      return;
+    }
     if (profilePath === null) return;
     if (profilePath) navigate(profilePath);
     else if (produto.seller_id) navigate(`/maes/${produto.seller_id}`);

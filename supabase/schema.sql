@@ -3,6 +3,7 @@
 -- Ele remove as tabelas do app antigo e cria o modelo social/marketplace/admin.
 
 drop table if exists public.messages cascade;
+drop table if exists public.store_reviews cascade;
 drop table if exists public.mother_reviews cascade;
 drop table if exists public.conversations cascade;
 drop table if exists public.friendships cascade;
@@ -27,6 +28,12 @@ create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   full_name text not null,
   city text,
+  hometown text,
+  birth_date date,
+  relationship_status text check (
+    relationship_status is null
+    or relationship_status in ('relacionamento_serio', 'casada', 'solteira', 'noiva', 'prefere_nao_dizer')
+  ),
   bio text,
   avatar_url text,
   account_type text not null default 'user' check (account_type in ('user', 'store')),
@@ -201,6 +208,22 @@ create table public.mother_reviews (
 
 create index mother_reviews_reviewed_id_idx on public.mother_reviews (reviewed_id, created_at desc);
 
+create table public.store_reviews (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references public.conversations(id) on delete cascade,
+  store_product_id uuid references public.store_products(id) on delete set null,
+  store_id uuid not null references public.stores(id) on delete cascade,
+  reviewer_id uuid not null references public.profiles(id) on delete cascade,
+  rating integer not null check (rating between 1 and 5),
+  comment text check (comment is null or char_length(comment) <= 600),
+  status text not null default 'published' check (status in ('published', 'hidden', 'removed')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (conversation_id)
+);
+
+create index store_reviews_store_id_idx on public.store_reviews (store_id, created_at desc);
+
 create table public.messages (
   id uuid primary key default gen_random_uuid(),
   conversation_id uuid not null references public.conversations(id) on delete cascade,
@@ -249,6 +272,9 @@ create trigger store_products_updated_at before update on public.store_products
 for each row execute function public.set_updated_at();
 
 create trigger mother_reviews_updated_at before update on public.mother_reviews
+for each row execute function public.set_updated_at();
+
+create trigger store_reviews_updated_at before update on public.store_reviews
 for each row execute function public.set_updated_at();
 
 create or replace function public.ensure_maternia_wallet()
@@ -387,6 +413,7 @@ alter table public.comments enable row level security;
 alter table public.reports enable row level security;
 alter table public.conversations enable row level security;
 alter table public.mother_reviews enable row level security;
+alter table public.store_reviews enable row level security;
 alter table public.messages enable row level security;
 alter table public.friendships enable row level security;
 
@@ -512,6 +539,35 @@ create policy "mother reviews buyer insert" on public.mother_reviews for insert 
 );
 create policy "mother reviews admin update" on public.mother_reviews for update using (public.is_admin()) with check (public.is_admin());
 create policy "mother reviews admin delete" on public.mother_reviews for delete using (public.is_admin());
+
+create policy "store reviews public read" on public.store_reviews for select using (status = 'published' or reviewer_id = auth.uid() or public.is_admin());
+create policy "store reviews buyer insert" on public.store_reviews for insert with check (
+  auth.uid() = reviewer_id
+  and status = 'published'
+  and exists (
+    select 1
+    from public.conversations c
+    join public.store_products sp on sp.id = c.store_product_id
+    join public.stores s on s.id = sp.store_id
+    join public.profiles buyer on buyer.id = c.buyer_id
+    join public.profiles seller on seller.id = c.seller_id
+    where c.id = conversation_id
+    and c.product_id is null
+    and c.store_product_id is not null
+    and c.store_product_id = store_reviews.store_product_id
+    and sp.store_id = store_reviews.store_id
+    and c.buyer_id = auth.uid()
+    and c.seller_id = s.owner_id
+    and buyer.account_type = 'user'
+    and seller.account_type = 'store'
+    and buyer.status = 'active'
+    and seller.status = 'active'
+    and s.status = 'verified'
+    and exists (select 1 from public.messages m where m.conversation_id = c.id)
+  )
+);
+create policy "store reviews admin update" on public.store_reviews for update using (public.is_admin()) with check (public.is_admin());
+create policy "store reviews admin delete" on public.store_reviews for delete using (public.is_admin());
 
 create policy "messages participants read" on public.messages for select using (
   exists (

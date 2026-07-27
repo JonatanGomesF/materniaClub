@@ -28,15 +28,34 @@ function Chat() {
     return conversation.buyer_id === session.user.id ? conversation.seller : conversation.buyer;
   }
 
+  function isStoreConversation(conversation) {
+    return Boolean(conversation?.store_product_id && !conversation.product_id);
+  }
+
   function canReviewConversation(conversation) {
+    if (!session?.user || !conversation || conversation.buyer_id !== session.user.id || conversation.seller_id === session.user.id) {
+      return false;
+    }
+
+    if (isStoreConversation(conversation)) {
+      return conversation.seller?.account_type === "store";
+    }
+
     return Boolean(
-      session?.user
-      && conversation?.product_id
+      conversation.product_id
       && !conversation.store_product_id
-      && conversation.buyer_id === session.user.id
-      && conversation.seller_id !== session.user.id
       && conversation.seller?.account_type === "user"
     );
+  }
+
+  function getReviewTargetName(conversation) {
+    if (!conversation) return "essa negociacao";
+    if (isStoreConversation(conversation)) return conversation.store_products?.stores?.name || conversation.seller?.full_name || "essa loja";
+    return conversation.seller?.full_name || "essa mamae";
+  }
+
+  function getReviewTargetType(conversation) {
+    return isStoreConversation(conversation) ? "loja" : "mamae";
   }
 
   const markConversationAsRead = useCallback(async (conversationId, userId) => {
@@ -96,27 +115,50 @@ function Chat() {
       return;
     }
 
-    const reviewableIds = conversationRows
+    const motherReviewableIds = conversationRows
       .filter((conversation) => conversation.buyer_id === userId && conversation.product_id && !conversation.store_product_id)
       .map((conversation) => conversation.id);
 
-    if (reviewableIds.length === 0) {
+    const storeReviewableIds = conversationRows
+      .filter((conversation) => conversation.buyer_id === userId && conversation.store_product_id && !conversation.product_id)
+      .map((conversation) => conversation.id);
+
+    if (motherReviewableIds.length === 0 && storeReviewableIds.length === 0) {
       setReviewsByConversation({});
       return;
     }
 
-    const { data, error } = await supabase
-      .from("mother_reviews")
-      .select("*")
-      .eq("reviewer_id", userId)
-      .in("conversation_id", reviewableIds);
+    const nextReviews = {};
 
-    if (error) return;
+    if (motherReviewableIds.length > 0) {
+      const { data, error } = await supabase
+        .from("mother_reviews")
+        .select("*")
+        .eq("reviewer_id", userId)
+        .in("conversation_id", motherReviewableIds);
 
-    setReviewsByConversation((data || []).reduce((map, review) => {
-      map[review.conversation_id] = review;
-      return map;
-    }, {}));
+      if (!error) {
+        (data || []).forEach((review) => {
+          nextReviews[review.conversation_id] = { ...review, review_type: "mother" };
+        });
+      }
+    }
+
+    if (storeReviewableIds.length > 0) {
+      const { data, error } = await supabase
+        .from("store_reviews")
+        .select("*")
+        .eq("reviewer_id", userId)
+        .in("conversation_id", storeReviewableIds);
+
+      if (!error) {
+        (data || []).forEach((review) => {
+          nextReviews[review.conversation_id] = { ...review, review_type: "store" };
+        });
+      }
+    }
+
+    setReviewsByConversation(nextReviews);
   }, []);
 
   useEffect(() => {
@@ -127,7 +169,7 @@ function Chat() {
 
       let { data, error } = await supabase
         .from("conversations")
-        .select("*, buyer:profiles!conversations_buyer_id_fkey(id, full_name, avatar_url, account_type), seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url, account_type), products(title, image_url), store_products(title, image_url, stores(name))")
+        .select("*, buyer:profiles!conversations_buyer_id_fkey(id, full_name, avatar_url, account_type), seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url, account_type), products(title, image_url), store_products(title, image_url, store_id, stores(id, name))")
         .or(`buyer_id.eq.${currentSession.user.id},seller_id.eq.${currentSession.user.id}`)
         .order("created_at", { ascending: false });
 
@@ -202,16 +244,33 @@ function Chat() {
       return;
     }
 
-    const { data, error } = await supabase
-      .from("mother_reviews")
-      .insert({
+    const isStoreReview = isStoreConversation(activeConversation);
+    const storeId = activeConversation.store_products?.store_id || activeConversation.store_products?.stores?.id;
+    if (isStoreReview && !storeId) {
+      alert("Nao consegui identificar a loja dessa conversa.");
+      return;
+    }
+
+    const reviewTable = isStoreReview ? "store_reviews" : "mother_reviews";
+    const payload = isStoreReview ? {
+      conversation_id: activeConversation.id,
+      store_product_id: activeConversation.store_product_id,
+      store_id: storeId,
+      reviewer_id: session.user.id,
+      rating,
+      comment: reviewDraft.comment.trim() || null,
+    } : {
         conversation_id: activeConversation.id,
         product_id: activeConversation.product_id,
         reviewer_id: session.user.id,
         reviewed_id: activeConversation.seller_id,
         rating,
         comment: reviewDraft.comment.trim() || null,
-      })
+      };
+
+    const { data, error } = await supabase
+      .from(reviewTable)
+      .insert(payload)
       .select()
       .maybeSingle();
 
@@ -220,13 +279,13 @@ function Chat() {
         alert("Voce ja avaliou essa negociacao.");
         return;
       }
-      alert(error.message.includes("mother_reviews")
-        ? "Execute o SQL mother-reviews-update.sql no Supabase para ativar avaliacoes."
+      alert(error.message.includes("reviews")
+        ? `Execute o SQL ${isStoreReview ? "store-reviews-update.sql" : "mother-reviews-update.sql"} no Supabase para ativar avaliacoes.`
         : error.message);
       return;
     }
 
-    setReviewsByConversation((current) => ({ ...current, [activeConversation.id]: data }));
+    setReviewsByConversation((current) => ({ ...current, [activeConversation.id]: { ...data, review_type: isStoreReview ? "store" : "mother" } }));
     setReviewDraft({ rating: 5, comment: "" });
     setIsReviewOpen(false);
   }
@@ -267,7 +326,12 @@ function Chat() {
           {activeConversation ? (
             <>
               {getOtherParticipant(activeConversation) && (
-                <Link className="chat-person-link" to={`/maes/${getOtherParticipant(activeConversation).id}`}>
+                <Link
+                  className="chat-person-link"
+                  to={isStoreConversation(activeConversation) && activeConversation.store_products?.stores?.id
+                    ? `/lojas?store=${activeConversation.store_products.stores.id}`
+                    : `/maes/${getOtherParticipant(activeConversation).id}`}
+                >
                   <span className="chat-person-avatar">
                     {getOtherParticipant(activeConversation).avatar_url ? (
                       <img src={getOtherParticipant(activeConversation).avatar_url} alt="" />
@@ -279,7 +343,7 @@ function Chat() {
                     <small>Conversando com</small>
                     <strong>{getOtherParticipant(activeConversation).full_name || "Mae da comunidade"}</strong>
                   </span>
-                  <span className="chat-profile-hint">Ver perfil</span>
+                  <span className="chat-profile-hint">{isStoreConversation(activeConversation) ? "Ver loja" : "Ver perfil"}</span>
                 </Link>
               )}
               <div className="chat-product-strip">
@@ -291,14 +355,14 @@ function Chat() {
                 <div className="review-nudge">
                   {activeReview ? (
                     <>
-                      <strong>Voce avaliou essa mamae com {activeReview.rating} estrelas.</strong>
+                      <strong>Voce avaliou essa {getReviewTargetType(activeConversation)} com {activeReview.rating} estrelas.</strong>
                       <span>Obrigada por ajudar outras maes a comprarem com mais seguranca.</span>
                     </>
                   ) : (
                     <>
                       <div>
-                        <strong>O que voce achou dessa mamae?</strong>
-                        <span>Avalie sua negociacao com {activeConversation.seller?.full_name || "essa mamae"}.</span>
+                        <strong>O que voce achou dessa {getReviewTargetType(activeConversation)}?</strong>
+                        <span>Avalie sua negociacao com {getReviewTargetName(activeConversation)}.</span>
                       </div>
                       <button className="primary-button small" onClick={() => setIsReviewOpen(true)}>Avaliar</button>
                     </>
@@ -323,8 +387,8 @@ function Chat() {
                 <div className="review-modal-backdrop" role="presentation" onClick={() => setIsReviewOpen(false)}>
                   <form className="review-modal" onClick={(event) => event.stopPropagation()} onSubmit={submitReview}>
                     <span className="eyebrow">Avaliacao</span>
-                    <h2>O que voce achou dessa mamae?</h2>
-                    <p>Sua avaliacao aparece no perfil dela e ajuda outras maes da comunidade.</p>
+                    <h2>O que voce achou dessa {getReviewTargetType(activeConversation)}?</h2>
+                    <p>Sua avaliacao aparece no perfil e ajuda outras maes da comunidade.</p>
                     <div className="star-picker" aria-label="Nota da avaliacao">
                       {[1, 2, 3, 4, 5].map((star) => (
                         <button

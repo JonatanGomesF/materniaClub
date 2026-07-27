@@ -6,6 +6,7 @@ function Navbar() {
   const [account, setAccount] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [wallet, setWallet] = useState({ userId: null, balance: null });
+  const [isWalletOpen, setIsWalletOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -104,6 +105,7 @@ function Navbar() {
   };
 
   const visibleWalletBalance = account?.accountType === "user" && wallet.userId === account?.id ? wallet.balance : null;
+  const coinLabel = visibleWalletBalance === 1 ? "MaterniaCoin" : "MaterniaCoins";
 
   return (
     <header className="topbar">
@@ -138,10 +140,10 @@ function Navbar() {
               <strong>Ola, {account.firstName}</strong>
               <small>{account.email}</small>
               {visibleWalletBalance !== null && (
-                <span className="coin-balance" title="Suas moedas maternia">
+                <button className="coin-balance" title="Suas moedas maternia" type="button" onClick={() => setIsWalletOpen(true)}>
                   <span>M</span>
                   {visibleWalletBalance} moedas
-                </span>
+                </button>
               )}
             </span>
             <button className="logout-button" onClick={logout}>Sair</button>
@@ -150,6 +152,17 @@ function Navbar() {
           <Link className="nav-login-button" to="/login">Entrar</Link>
         )}
       </div>
+
+      {visibleWalletBalance !== null && isWalletOpen && (
+        <div className="coin-modal-backdrop" role="presentation" onClick={() => setIsWalletOpen(false)}>
+          <section className="coin-modal" role="dialog" aria-modal="true" aria-label="Saldo de MaterniaCoins" onClick={(event) => event.stopPropagation()}>
+            <button className="coin-modal-close" type="button" onClick={() => setIsWalletOpen(false)}>Fechar</button>
+            <span className="coin-modal-icon">M</span>
+            <h2>Voce tem {visibleWalletBalance} {coinLabel}</h2>
+            <p>Use suas moedas em beneficios, descontos e vantagens dentro do materniaClub.</p>
+          </section>
+        </div>
+      )}
     </header>
   );
 }
