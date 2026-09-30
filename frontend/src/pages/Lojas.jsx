@@ -2,6 +2,16 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import ProdutoCard from "../components/ProdutoCard";
 import { ensureUserProfile, getCurrentSession, supabase, uploadMedia } from "../lib/supabaseClient";
+import { useToast } from "../lib/toastContext";
+
+function formatCNPJ(value) {
+  const digits = value.replace(/\D/g, "").slice(0, 14);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 5) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+  if (digits.length <= 8) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`;
+  if (digits.length <= 12) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12, 14)}`;
+}
 
 const emptyStore = {
   name: "",
@@ -30,6 +40,7 @@ const emptyProduct = {
 };
 
 function Lojas() {
+  const { toast, showConfirm } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -39,13 +50,13 @@ function Lojas() {
   const [myProducts, setMyProducts] = useState([]);
   const [storeReviews, setStoreReviews] = useState([]);
   const [selectedStore, setSelectedStore] = useState(null);
-  const [activeView, setActiveView] = useState(() => searchParams.get("view") === "manage" ? "manage" : "showcase");
+  const [activeView, setActiveView] = useState(() => (searchParams.get("view") === "manage" ? "manage" : "showcase"));
+
+  const [storeSearch, setStoreSearch] = useState("");
   const [storeForm, setStoreForm] = useState(emptyStore);
   const [storeAccess, setStoreAccess] = useState(emptyStoreAccess);
   const [productForm, setProductForm] = useState(emptyProduct);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [selectedStoreProfile, setSelectedStoreProfile] = useState(null);
   const [file, setFile] = useState(null);
   const [logoFile, setLogoFile] = useState(null);
   const [coverFile, setCoverFile] = useState(null);
@@ -66,14 +77,14 @@ function Lojas() {
     setStores(visibleStores);
 
     if (visibleStores.length > 0) {
-      const { data: reviewRows, error: reviewError } = await supabase
+      const { data: reviewRows } = await supabase
         .from("store_reviews")
         .select("*, reviewer:profiles!store_reviews_reviewer_id_fkey(full_name, avatar_url)")
         .in("store_id", visibleStores.map((item) => item.id))
         .eq("status", "published")
         .order("created_at", { ascending: false });
 
-      setStoreReviews(reviewError ? [] : reviewRows || []);
+      setStoreReviews(reviewRows || []);
     } else {
       setStoreReviews([]);
     }
@@ -90,8 +101,11 @@ function Lojas() {
     const requestedStoreId = searchParams.get("store");
     const requestedProductId = searchParams.get("produto");
     if (requestedStoreId) {
-      const storeFromUrl = visibleStores.find((item) => item.id === requestedStoreId)
-        || visibleStores.find((item) => visibleProducts.some((product) => product.id === requestedProductId && product.store_id === item.id));
+      const storeFromUrl =
+        visibleStores.find((item) => item.id === requestedStoreId) ||
+        visibleStores.find((item) =>
+          visibleProducts.some((product) => product.id === requestedProductId && product.store_id === item.id)
+        );
       if (storeFromUrl) {
         setSelectedStore(storeFromUrl);
         setActiveView("showcase");
@@ -115,7 +129,7 @@ function Lojas() {
     if (myStore) {
       setStoreForm({
         name: myStore.name || "",
-        cnpj: myStore.cnpj || "",
+        cnpj: formatCNPJ(myStore.cnpj || ""),
         city: myStore.city || "",
         description: myStore.description || "",
         logo_url: myStore.logo_url || "",
@@ -139,16 +153,25 @@ function Lojas() {
       setProfile(currentProfile);
       loadStores(currentSession, currentProfile);
     }
-
     load();
   }, [loadStores]);
 
   function updateStoreForm(event) {
-    setStoreForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+    const { name, value } = event.target;
+    if (name === "cnpj") {
+      setStoreForm((current) => ({ ...current, cnpj: formatCNPJ(value) }));
+    } else {
+      setStoreForm((current) => ({ ...current, [name]: value }));
+    }
   }
 
   function updateStoreAccess(event) {
-    setStoreAccess((current) => ({ ...current, [event.target.name]: event.target.value }));
+    const { name, value } = event.target;
+    if (name === "cnpj") {
+      setStoreAccess((current) => ({ ...current, cnpj: formatCNPJ(value) }));
+    } else {
+      setStoreAccess((current) => ({ ...current, [name]: value }));
+    }
   }
 
   function updateProductForm(event) {
@@ -157,9 +180,20 @@ function Lojas() {
 
   async function saveStore(event) {
     event.preventDefault();
-    if (!supabase || !session?.user) return alert("Entre no app para cadastrar sua loja.");
-    if (profile?.account_type !== "store") return alert("Esta area e exclusiva para contas de loja.");
-    if (!storeForm.name.trim() || !storeForm.cnpj.trim()) return alert("Informe nome da loja e CNPJ.");
+    if (!supabase || !session?.user) {
+      toast.info("Entre no app para cadastrar sua loja.");
+      return;
+    }
+    if (profile?.account_type !== "store") {
+      toast.warning("Esta área é exclusiva para contas de loja parceira.");
+      return;
+    }
+
+    const rawCnpj = storeForm.cnpj.replace(/\D/g, "");
+    if (!storeForm.name.trim() || rawCnpj.length !== 14) {
+      toast.warning("Informe o nome da loja e um CNPJ válido com 14 dígitos.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -170,7 +204,7 @@ function Lojas() {
       const payload = {
         owner_id: session.user.id,
         name: storeForm.name.trim(),
-        cnpj: storeForm.cnpj.trim(),
+        cnpj: rawCnpj,
         city: storeForm.city.trim(),
         description: storeForm.description.trim(),
         logo_url: logoUrl,
@@ -183,13 +217,15 @@ function Lojas() {
         : await supabase.from("stores").insert(payload);
 
       if (error) throw error;
+
+      toast.success("Dados da loja atualizados!");
       setLogoFile(null);
       setCoverFile(null);
       await loadStores(session, { ...profile, account_type: "store" });
       setActiveView("manage");
       setIsStoreEditOpen(false);
     } catch (error) {
-      alert(error.message);
+      toast.error(error.message || "Erro ao salvar loja");
     } finally {
       setSaving(false);
     }
@@ -197,47 +233,52 @@ function Lojas() {
 
   async function registerStoreAccount(event) {
     event.preventDefault();
-    if (!supabase) return alert("Conecte o Supabase para cadastrar lojas.");
-    if (!storeAccess.email || !storeAccess.password || !storeAccess.name || !storeAccess.cnpj) {
-      return alert("Informe email, senha, nome da loja e CNPJ.");
+    if (!supabase) return toast.warning("Conecte o Supabase para cadastrar lojas.");
+
+    const rawCnpj = storeAccess.cnpj.replace(/\D/g, "");
+    if (!storeAccess.email || !storeAccess.password || !storeAccess.name || rawCnpj.length !== 14) {
+      return toast.warning("Preencha email, senha, nome da loja e CNPJ válido.");
     }
 
     setSaving(true);
     try {
       const { data, error } = await supabase.auth.signUp({
-        email: storeAccess.email,
+        email: storeAccess.email.trim(),
         password: storeAccess.password,
-        options: { data: { full_name: storeAccess.name, account_type: "store" } },
+        options: { data: { full_name: storeAccess.name.trim(), account_type: "store", cnpj: rawCnpj } },
       });
 
       if (error) throw error;
 
       if (!data.session?.user) {
-        alert("Conta da loja criada. Confirme o email e depois entre novamente em Minha loja.");
+        toast.info("Conta da loja criada! Verifique seu email para confirmar o acesso.");
         return;
       }
 
       const storeProfile = await ensureUserProfile(data.session.user, {
-        full_name: storeAccess.name,
-        city: storeAccess.city,
+        full_name: storeAccess.name.trim(),
+        city: storeAccess.city.trim(),
         account_type: "store",
       });
 
       const { error: storeError } = await supabase.from("stores").insert({
         owner_id: data.session.user.id,
         name: storeAccess.name.trim(),
-        cnpj: storeAccess.cnpj.trim(),
+        cnpj: rawCnpj,
         city: storeAccess.city.trim(),
         description: storeAccess.description.trim(),
+        status: "pending",
       });
 
       if (storeError) throw storeError;
+
+      toast.success("Loja cadastrada com sucesso! Enviada para análise.");
       setSession(data.session);
       setProfile(storeProfile);
       setStoreAccess(emptyStoreAccess);
       await loadStores(data.session, storeProfile);
     } catch (error) {
-      alert(error.message);
+      toast.error(error.message || "Erro ao cadastrar loja");
     } finally {
       setSaving(false);
     }
@@ -253,7 +294,6 @@ function Lojas() {
       description: product.description || "",
     });
     setFile(null);
-    setSelectedProduct(null);
     setIsProductFormOpen(true);
   }
 
@@ -273,9 +313,9 @@ function Lojas() {
 
   async function saveProduct(event) {
     event.preventDefault();
-    if (!supabase || !session?.user || !store) return alert("Cadastre sua loja antes de publicar produtos.");
-    if (store.status !== "verified") return alert("Sua loja precisa ser verificada pelo admin antes de publicar produtos.");
-    if (!productForm.title.trim() || !productForm.price) return alert("Informe nome e preco do produto.");
+    if (!supabase || !session?.user || !store) return toast.info("Cadastre sua loja antes de publicar produtos.");
+    if (store.status !== "verified") return toast.warning("Sua loja precisa ser verificada pela moderação antes de publicar.");
+    if (!productForm.title.trim() || !productForm.price) return toast.warning("Informe nome e preço do produto.");
 
     setSaving(true);
     try {
@@ -297,13 +337,11 @@ function Lojas() {
 
       if (error) throw error;
 
-      setProductForm(emptyProduct);
-      setEditingProduct(null);
-      setFile(null);
-      setIsProductFormOpen(false);
+      toast.success(editingProduct ? "Produto atualizado com sucesso!" : "Produto adicionado à sua vitrine!");
+      closeProductForm();
       await loadStores(session, profile);
     } catch (error) {
-      alert(error.message);
+      toast.error(error.message || "Erro ao salvar produto");
     } finally {
       setSaving(false);
     }
@@ -311,29 +349,35 @@ function Lojas() {
 
   async function updateProductStatus(product, status) {
     const { error } = await supabase.from("store_products").update({ status }).eq("id", product.id);
-    if (error) return alert(error.message);
-    setSelectedProduct(null);
+    if (error) return toast.error(error.message);
+    toast.success(status === "sold" ? "Marcado como esgotado/vendido!" : "Produto liberado para venda!");
     loadStores(session, profile);
   }
 
   async function deleteProduct(product) {
-    const confirmed = window.confirm("Excluir definitivamente este produto da loja?");
+    const confirmed = await showConfirm(
+      "Excluir produto da vitrine",
+      "Deseja excluir definitivamente este item do catálogo?",
+      "Excluir",
+      "Cancelar",
+      true
+    );
     if (!confirmed) return;
 
     const { error } = await supabase.from("store_products").delete().eq("id", product.id);
-    if (error) return alert(error.message);
-    setSelectedProduct(null);
+    if (error) return toast.error(error.message);
+    toast.success("Produto excluído com sucesso.");
     loadStores(session, profile);
   }
 
   async function startStoreConversation(product) {
     if (!supabase || !session?.user) {
-      alert("Faca login para comprar produtos das lojas.");
+      toast.info("Faça login para conversar com a loja parceira.");
       return;
     }
 
     if (product.seller_id === session.user.id) {
-      alert("Voce esta administrando esta loja.");
+      toast.warning("Você administra esta loja.");
       return;
     }
 
@@ -370,38 +414,16 @@ function Lojas() {
         conversation = createdStoreConversation;
       }
 
-      if (!conversation && existingStoreError) {
-        const { data: existingConversation } = await supabase
-          .from("conversations")
-          .select("*")
-          .is("product_id", null)
-          .eq("buyer_id", session.user.id)
-          .eq("seller_id", product.seller_id)
-          .maybeSingle();
-
-        conversation = existingConversation;
-
-        if (!conversation) {
-          const { data: createdConversation, error: createError } = await supabase
-            .from("conversations")
-            .insert(baseConversation)
-            .select()
-            .maybeSingle();
-
-          if (createError) throw createError;
-          conversation = createdConversation;
-        }
-      }
-
       await supabase.from("messages").insert({
         conversation_id: conversation.id,
         sender_id: session.user.id,
-        body: `Quero comprar na loja: ${product.title}`,
+        body: `Olá! Quero comprar na loja o produto: ${product.title}`,
       });
 
+      toast.success("Conversa aberta no Chat!");
       window.location.href = `/chat?conversation=${conversation.id}`;
     } catch (error) {
-      alert(error.message);
+      toast.error(error.message || "Erro ao iniciar conversa");
     }
   }
 
@@ -413,9 +435,18 @@ function Lojas() {
     ...product,
     condition: "novo",
     seller_id: product.stores?.owner_id,
-    profiles: { full_name: product.stores?.name || "Loja parceira" },
+    profiles: { full_name: product.stores?.name || "Loja Parceira" },
     city: product.city || product.stores?.city,
   }));
+
+  const filteredStores = stores.filter((s) => {
+    if (!storeSearch.trim()) return true;
+    return (
+      s.name.toLowerCase().includes(storeSearch.toLowerCase()) ||
+      s.city?.toLowerCase().includes(storeSearch.toLowerCase()) ||
+      s.description?.toLowerCase().includes(storeSearch.toLowerCase())
+    );
+  });
 
   function getStoreProductCount(storeItem) {
     return storeProducts.filter((product) => product.store_id === storeItem.id).length;
@@ -435,446 +466,147 @@ function Lojas() {
 
   function renderStars(rating) {
     return [1, 2, 3, 4, 5].map((star) => (
-      <span className={star <= Number(rating) ? "active" : ""} key={star}>{"\u2605"}</span>
+      <span className={star <= Number(rating) ? "star-active" : "star-inactive"} key={star}>
+        ★
+      </span>
     ));
   }
 
-  function getStoreStatusLabel(status) {
-    const labels = {
-      pending: "Aguardando verificacao",
-      verified: "Loja verificada",
-      rejected: "Cadastro recusado",
-      suspended: "Loja suspensa",
-      hidden: "Loja oculta",
-      removed: "Loja removida",
-    };
-
-    return labels[status] || "Perfil em criacao";
-  }
-
-  function openStoreEdit() {
-    if (store) {
-      setStoreForm({
-        name: store.name || "",
-        cnpj: store.cnpj || "",
-        city: store.city || "",
-        description: store.description || "",
-        logo_url: store.logo_url || "",
-        cover_url: store.cover_url || "",
-      });
-    }
-
-    setLogoFile(null);
-    setCoverFile(null);
-    setIsStoreEditOpen(true);
-  }
-
-  function openProductDetails(product, contextStore = null) {
-    const sourceStore = contextStore || product.stores || store || null;
-    setSelectedProduct({
-      ...product,
-      city: product.city || sourceStore?.city,
-      condition: product.condition || "novo",
-      seller_id: product.seller_id || sourceStore?.owner_id || session?.user?.id,
-      stores: sourceStore,
-      profiles: product.profiles || { full_name: sourceStore?.name || "Loja parceira" },
-    });
-  }
-
-  function formatPrice(value) {
-    return Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  }
-
-  const activeProductsCount = storeProducts.length;
-  const activeStoresCount = stores.length;
-  const visibleProductsCount = selectedStore ? selectedStoreProducts.length : activeProductsCount;
-  const storeMetrics = [
-    { label: "Lojas verificadas", value: activeStoresCount },
-    { label: "Produtos na vitrine", value: activeProductsCount },
-    { label: "Vitrine aberta", value: selectedStore ? selectedStore.name : "Todas" },
-  ];
-
-  function openShowcase() {
-    setActiveView("showcase");
-    setSelectedStore(null);
-    setSelectedStoreProfile(null);
-    setSearchParams({});
-  }
-
-  const selectedStoreProfileReviews = selectedStoreProfile ? getStoreReviews(selectedStoreProfile) : [];
-  const selectedStoreProfileRating = selectedStoreProfile ? getStoreAverageRating(selectedStoreProfile) : null;
+  const isStoreOwner = profile?.account_type === "store";
 
   return (
-    <div className="stores-dashboard">
-      <aside className="stores-sidebar">
-        <Link className="brand stores-brand" to="/">
-          <span className="brand-mark">
-            <img src="/maternia-logo.png" alt="Logo materniaClub" />
-          </span>
-          <span>materniaClub</span>
-        </Link>
-        <nav className="stores-side-nav" aria-label="Navegacao de lojas">
-          <button className={activeView === "showcase" ? "active" : ""} onClick={openShowcase}>Vitrine</button>
-          {profile?.account_type === "store" && (
-            <button className={activeView === "manage" ? "active" : ""} onClick={() => setActiveView("manage")}>Minha loja</button>
-          )}
-          <Link to="/chat">Chat</Link>
-        </nav>
-        <div className="stores-side-note">
-          <strong>Ofertas infantis</strong>
-          <span>Produtos, promocoes e lojas parceiras em um painel simples para maes.</span>
+    <div className="page-shell stores-layout">
+      {/* HEADER SECTION */}
+      <section className="section-heading store-heading">
+        <div>
+          <span className="eyebrow">Lojas Parceiras</span>
+          <h1>Vitrines comerciais verificadas para você e seu bebê.</h1>
+          <p>
+            Compre direto de marcas, lojistas e fabricantes infantis com garantia de procedência, CNPJ checado e
+            atendimento exclusivo via chat.
+          </p>
         </div>
-      </aside>
 
-      <div className="page-shell stores-page">
-        <section className="stores-hero-dark">
-          <div>
-            <span className="eyebrow">Lojas parceiras</span>
-            <h1>Ofertas infantis em uma vitrine feita para maes.</h1>
-            <p>Lojas divulgam produtos, promocoes e artigos infantis enquanto maes continuam usando feed, marketplace e chat normalmente.</p>
-          </div>
-          <div className="store-view-switch">
-            <button className={activeView === "showcase" ? "primary-button" : "soft-button"} onClick={openShowcase}>Ver vitrine</button>
-            {profile?.account_type === "store" && (
-              <button className={activeView === "manage" ? "primary-button" : "soft-button"} onClick={() => setActiveView("manage")}>Minha loja</button>
-            )}
-          </div>
-        </section>
+        <div className="stores-nav-tabs">
+          <button
+            type="button"
+            className={`tab-btn ${activeView === "showcase" ? "active" : ""}`}
+            onClick={() => {
+              setActiveView("showcase");
+              setSelectedStore(null);
+            }}
+          >
+            Vitrines de Lojas
+          </button>
+          <button
+            type="button"
+            className={`tab-btn ${activeView === "manage" ? "active" : ""}`}
+            onClick={() => setActiveView("manage")}
+          >
+            {isStoreOwner ? "Minha Loja & Painel" : "Seja uma Loja Parceira"}
+          </button>
+        </div>
+      </section>
 
-        <section className="store-metric-grid">
-          {storeMetrics.map((metric) => (
-            <div className="store-metric-card" key={metric.label}>
-              <span>{metric.label}</span>
-              <strong>{metric.value}</strong>
-            </div>
-          ))}
-        </section>
+      {/* VIEW: SHOWCASE */}
+      {activeView === "showcase" && (
+        <>
+          {selectedStore ? (
+            /* STORE DETAIL SHOWCASE */
+            <section className="selected-store-view">
+              <button
+                type="button"
+                className="ghost-button back-to-stores-btn"
+                onClick={() => setSelectedStore(null)}
+              >
+                ← Voltar para todas as lojas
+              </button>
 
-        {activeView === "manage" ? (
-          <section className="store-admin-panel">
-          {!session ? (
-            <div className="store-empty-admin">
-              <h2>Acesso exclusivo para lojas</h2>
-              <p>Maes usam Feed, Marketplace e Vitrine. Lojas usam esta area para cadastrar a vitrine e anunciar produtos infantis.</p>
-              <form className="store-access-form" onSubmit={registerStoreAccount}>
-                <input name="name" placeholder="Nome da loja" value={storeAccess.name} onChange={updateStoreAccess} />
-                <input name="cnpj" placeholder="CNPJ" value={storeAccess.cnpj} onChange={updateStoreAccess} />
-                <input name="city" placeholder="Cidade da loja" value={storeAccess.city} onChange={updateStoreAccess} />
-                <input name="email" type="email" placeholder="Email da loja" value={storeAccess.email} onChange={updateStoreAccess} />
-                <input name="password" type="password" placeholder="Senha" value={storeAccess.password} onChange={updateStoreAccess} />
-                <textarea name="description" placeholder="Descricao curta da loja" value={storeAccess.description} onChange={updateStoreAccess} />
-                <button className="primary-button" disabled={saving}>{saving ? "Criando..." : "Cadastrar loja"}</button>
-              </form>
-              <Link className="ghost-button" to="/login">Ja tenho acesso de loja</Link>
-            </div>
-          ) : profile?.account_type !== "store" ? (
-            <div className="store-empty-admin">
-              <h2>Esta conta e de mae</h2>
-              <p>Para manter a plataforma organizada, maes compram, conversam e encontram ofertas. Apenas contas de loja podem administrar vitrines e produtos.</p>
-              <p className="hint">Saia desta conta e entre com o email da loja para acessar o painel de produtos.</p>
-            </div>
-          ) : (
-            <>
-              {store?.status === "pending" && <p className="notice">Cadastro recebido. Sua loja esta aguardando verificacao do admin. O selo verde e a publicacao no Feed so aparecem apos aprovacao.</p>}
-              {store?.status === "rejected" && <p className="notice">O cadastro desta loja nao foi aprovado. Entre em contato com a administracao para revisar os dados.</p>}
-              {store?.status === "suspended" && <p className="notice">Esta loja esta suspensa e nao pode publicar produtos no momento.</p>}
-              <section className="store-profile-card">
-                <div className="store-profile-cover">
-                  {store?.cover_url ? <img src={store.cover_url} alt="" /> : <span>Foto de capa da vitrine</span>}
-                </div>
-                <div className="store-profile-main">
-                  <div className="store-profile-logo">
-                    {store?.logo_url ? <img src={store.logo_url} alt={store.name} /> : <span>{store?.name?.charAt(0) || storeForm.name?.charAt(0) || "L"}</span>}
+              <div className="store-hero-card">
+                {selectedStore.cover_url && (
+                  <div className="store-hero-cover">
+                    <img src={selectedStore.cover_url} alt="Capa da loja" />
                   </div>
-                  <div className="store-profile-copy">
-                    <span className={store?.status === "verified" ? "store-status verified" : "store-status"}>{getStoreStatusLabel(store?.status)}</span>
-                    <h2>{store?.name || "Sua loja no materniaClub"}</h2>
-                    <p>{store?.description || "Adicione uma descricao curta para as maes entenderem o que sua loja vende."}</p>
-                    <div className="store-profile-meta">
-                      <span>{store?.city || "Cidade nao informada"}</span>
-                      <span>{myProducts.length} produtos cadastrados</span>
-                      <span>{myProducts.filter((product) => product.status === "sold").length} vendidos</span>
+                )}
+                <div className="store-hero-content">
+                  <div className="store-logo-large">
+                    {selectedStore.logo_url ? (
+                      <img src={selectedStore.logo_url} alt={selectedStore.name} />
+                    ) : (
+                      selectedStore.name.charAt(0)
+                    )}
+                  </div>
+                  <div className="store-hero-info">
+                    <div className="store-hero-title-row">
+                      <h2>{selectedStore.name}</h2>
+                      <span className="verified-store-badge">✓ Loja Verificada</span>
+                    </div>
+                    <p className="store-city-line">{selectedStore.city || "Brasil"} · CNPJ: {formatCNPJ(selectedStore.cnpj)}</p>
+                    <p className="store-hero-desc">{selectedStore.description || "Produtos infantis selecionados com carinho para as mamães."}</p>
+
+                    <div className="store-rating-summary">
+                      {getStoreAverageRating(selectedStore) ? (
+                        <>
+                          <span className="store-stars-row">{renderStars(getStoreAverageRating(selectedStore))}</span>
+                          <strong>{getStoreAverageRating(selectedStore)} / 5</strong>
+                          <span>({getStoreReviews(selectedStore).length} avaliações)</span>
+                        </>
+                      ) : (
+                        <span className="hint">Loja nova na plataforma</span>
+                      )}
                     </div>
                   </div>
-                  <button className="primary-button" onClick={openStoreEdit}>
-                    {store ? "Editar perfil da loja" : "Cadastrar perfil da loja"}
-                  </button>
                 </div>
-              </section>
+              </div>
 
-              {isStoreEditOpen && (
-                <div className="store-modal-backdrop" role="presentation" onClick={() => setIsStoreEditOpen(false)}>
-                  <form className="listing-form store-profile-modal" onClick={(event) => event.stopPropagation()} onSubmit={saveStore}>
-                    <div className="section-title-row">
-                      <div>
-                        <span className="eyebrow">{store ? "Editar loja" : "Cadastrar loja"}</span>
-                        <h2>Perfil da loja</h2>
-                      </div>
-                      <button className="ghost-button small" type="button" onClick={() => setIsStoreEditOpen(false)}>Fechar</button>
-                    </div>
-                    <div className="store-media-editor">
-                      <div className="store-logo-preview">{storeForm.logo_url ? <img src={storeForm.logo_url} alt="" /> : <span>{storeForm.name?.charAt(0) || "L"}</span>}</div>
-                      <label className="image-picker">
-                        <input type="file" accept="image/*" onChange={(event) => setLogoFile(event.target.files?.[0] || null)} />
-                        <span>{logoFile ? logoFile.name : "Alterar logo da loja"}</span>
-                      </label>
-                      <div className="store-cover-preview">{storeForm.cover_url ? <img src={storeForm.cover_url} alt="" /> : <span>Foto de capa</span>}</div>
-                      <label className="image-picker">
-                        <input type="file" accept="image/*" onChange={(event) => setCoverFile(event.target.files?.[0] || null)} />
-                        <span>{coverFile ? coverFile.name : "Alterar foto da vitrine"}</span>
-                      </label>
-                    </div>
-                    <input name="name" placeholder="Nome da loja" value={storeForm.name} onChange={updateStoreForm} />
-                    <input name="cnpj" placeholder="CNPJ" value={storeForm.cnpj} onChange={updateStoreForm} />
-                    <input name="city" placeholder="Cidade da loja" value={storeForm.city} onChange={updateStoreForm} />
-                    <textarea name="description" placeholder="Descricao curta da loja" value={storeForm.description} onChange={updateStoreForm} />
-                    <button className="primary-button" disabled={saving}>{saving ? "Atualizando..." : "Atualizar perfil"}</button>
-                  </form>
-                </div>
-              )}
-
-              {store?.status === "verified" ? (
-                <>
-                  <div className="store-product-create-cta">
-                    <div>
-                      <span className="eyebrow">Produtos da vitrine</span>
-                      <h2>Cadastre ofertas quando quiser anunciar algo novo.</h2>
-                    </div>
-                    <button className="primary-button" onClick={openProductCreate}>Cadastrar produto</button>
+              {/* STORE PRODUCTS */}
+              <section className="store-products-section">
+                <div className="store-panel-title">
+                  <div>
+                    <span className="eyebrow">Catálogo</span>
+                    <h2>Produtos disponíveis na loja</h2>
                   </div>
+                  <strong>{publicProducts.length} itens</strong>
+                </div>
 
-                  {isProductFormOpen && (
-                    <div className="store-modal-backdrop" role="presentation" onClick={closeProductForm}>
-                      <form className="listing-form store-profile-modal" onClick={(event) => event.stopPropagation()} onSubmit={saveProduct}>
-                        <div className="section-title-row">
-                          <div>
-                            <span className="eyebrow">{editingProduct ? "Editar produto" : "Novo produto"}</span>
-                            <h2>{editingProduct ? "Editar produto da vitrine" : "Cadastrar produto na vitrine"}</h2>
-                          </div>
-                          <button className="ghost-button small" type="button" onClick={closeProductForm}>Fechar</button>
-                        </div>
-                        <input name="title" placeholder="Nome do produto" value={productForm.title} onChange={updateProductForm} />
-                        <div className="form-grid">
-                          <input name="price" type="number" min="0" step="0.01" placeholder="Preco" value={productForm.price} onChange={updateProductForm} />
-                          <input name="city" placeholder="Cidade" value={productForm.city} onChange={updateProductForm} />
-                        </div>
-                        <select name="category" value={productForm.category} onChange={updateProductForm}>
-                          <option value="fraldas">Fraldas</option>
-                          <option value="chupetas">Chupetas</option>
-                          <option value="mamadeiras">Mamadeiras</option>
-                          <option value="carrinho">Carrinho</option>
-                          <option value="bebe conforto">Bebe conforto</option>
-                          <option value="roupinhas">Roupinhas</option>
-                          <option value="promocao">Promocao</option>
-                        </select>
-                        <textarea name="description" placeholder="Descricao, promocao ou detalhes" value={productForm.description} onChange={updateProductForm} />
-                        <label className="image-picker">
-                          <input type="file" accept="image/*" onChange={(event) => setFile(event.target.files?.[0] || null)} />
-                          <span>{file ? file.name : "Escolher imagem do produto"}</span>
-                        </label>
-                        <button className="primary-button" disabled={saving}>{saving ? "Salvando..." : editingProduct ? "Atualizar produto" : "Publicar produto"}</button>
-                      </form>
-                    </div>
-                  )}
-
-                  <div className="store-admin-list">
-                    <h2>Produtos da minha loja</h2>
-                    {myProducts.length === 0 ? (
-                      <p className="empty-state">Nenhum produto cadastrado ainda. Clique em cadastrar produto para criar o primeiro.</p>
-                ) : myProducts.map((product) => (
-                  <div className="store-admin-row clickable-card" key={product.id} onClick={() => openProductDetails(product, store)}>
-                    <div className="store-admin-product">
-                      <div className="store-admin-thumb">
-                        {product.image_url ? (
-                          <img src={product.image_url} alt={product.title} />
-                        ) : (
-                          <span>Sem foto</span>
-                        )}
-                      </div>
-                      <div>
-                        <strong>{product.title}</strong>
-                        <small>{product.category} - {product.city || store.city || "Cidade nao informada"}</small>
-                      </div>
-                    </div>
-                    <span>{formatPrice(product.price)}</span>
-                    <span className="tag">{product.status === "sold" ? "vendido" : product.status}</span>
-                    <button className="soft-button small" onClick={(event) => {
-                      event.stopPropagation();
-                      startEdit(product);
-                    }}>Editar</button>
-                        <button className="soft-button small" onClick={(event) => {
-                          event.stopPropagation();
-                          updateProductStatus(product, product.status === "sold" ? "active" : "sold");
-                        }}>
-                          {product.status === "sold" ? "Liberar venda" : "Marcar vendido"}
-                        </button>
-                        <button className="ghost-button small" onClick={(event) => {
-                          event.stopPropagation();
-                          updateProductStatus(product, "hidden");
-                        }}>Remover da vitrine</button>
-                        <button className="danger-button small" onClick={(event) => {
-                          event.stopPropagation();
-                          deleteProduct(product);
-                        }}>Excluir</button>
-                      </div>
+                {publicProducts.length === 0 ? (
+                  <div className="empty-state-card">
+                    <p>Esta loja ainda não adicionou produtos ativos no momento.</p>
+                  </div>
+                ) : (
+                  <div className="product-grid">
+                    {publicProducts.map((product) => (
+                      <ProdutoCard
+                        key={product.id}
+                        produto={product}
+                        currentUserId={session?.user?.id}
+                        interestLabel="Comprar da Loja"
+                        onInterest={startStoreConversation}
+                      />
                     ))}
                   </div>
-                </>
-              ) : store ? (
-                <p className="notice">Os produtos serao liberados quando a loja for verificada.</p>
-              ) : (
-                <p className="notice">Depois de criar a loja, o cadastro de produtos aparece aqui automaticamente.</p>
-              )}
-            </>
-          )}
-          </section>
-        ) : (
-          <section className="store-showcase">
-          {!selectedStore ? (
-            <>
-              <div className="store-panel-title">
-                <div>
-                  <span>Vitrine das lojas</span>
-                  <h2>Escolha uma loja para ver os itens</h2>
-                </div>
-                <strong>{visibleProductsCount} produtos ativos</strong>
-              </div>
-              {stores.length === 0 ? (
-                <p className="empty-state">As lojas parceiras aparecem aqui quando forem cadastradas.</p>
-              ) : (
-                <div className="store-front-grid">
-                  {stores.map((storeItem) => {
-                    const productCount = getStoreProductCount(storeItem);
-                    return (
-                      <button className="store-front-card" key={storeItem.id} onClick={() => {
-                        setSelectedStore(storeItem);
-                        setSearchParams({ store: storeItem.id });
-                      }}>
-                        {storeItem.cover_url && (
-                          <div className="store-front-cover">
-                            <img src={storeItem.cover_url} alt="" />
-                          </div>
-                        )}
-                        <div className="store-front-logo">
-                          {storeItem.logo_url ? <img src={storeItem.logo_url} alt={storeItem.name} /> : <span>{storeItem.name?.charAt(0) || "L"}</span>}
-                        </div>
-                        <div className="store-front-copy">
-                          <span className="eyebrow">{productCount} produtos</span>
-                          <h3>{storeItem.name}</h3>
-                          <p>{storeItem.description || "Vitrine com ofertas, promocoes e artigos infantis para maes."}</p>
-                          <div className="store-rating-line">
-                            <span className="review-stars">{renderStars(getStoreAverageRating(storeItem) || 0)}</span>
-                            <small>{getStoreAverageRating(storeItem) ? `${getStoreAverageRating(storeItem)} de 5` : "Sem avaliacoes"}</small>
-                          </div>
-                          <div className="store-front-meta">
-                            <span>{storeItem.city || "Cidade nao informada"}</span>
-                            <strong>Ver produtos</strong>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <div className="store-selected-header">
-                <div>
-                  <span className="eyebrow">Vitrine selecionada</span>
-                  <h2>{selectedStore.name}</h2>
-                  <p>{selectedStore.description || "Produtos, promocoes e artigos infantis desta loja."}</p>
-                  <small>{selectedStore.city || "Cidade nao informada"}</small>
-                </div>
-                <div className="store-selected-actions">
-                  <button className="primary-button" onClick={() => setSelectedStoreProfile(selectedStore)}>Perfil da loja</button>
-                  <button className="soft-button" onClick={openShowcase}>Voltar para lojas</button>
-                </div>
-              </div>
-
-              {publicProducts.length === 0 ? (
-                <p className="empty-state">Esta loja ainda nao tem produtos ativos na vitrine.</p>
-              ) : (
-                <div className="product-grid">
-                  {publicProducts.map((product) => (
-                    <ProdutoCard
-                      key={product.id}
-                      produto={product}
-                      currentUserId={session?.user?.id}
-                      interestLabel="Comprar"
-                      onInterest={startStoreConversation}
-                      onOpenDetails={(item) => openProductDetails(item, selectedStore)}
-                      onStatusChange={null}
-                      profilePath={null}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-          </section>
-        )}
-
-        {selectedStoreProfile && (
-          <div className="store-profile-public-backdrop" role="presentation" onClick={() => setSelectedStoreProfile(null)}>
-            <section className="store-public-profile-modal" onClick={(event) => event.stopPropagation()}>
-              <button className="product-detail-close" type="button" onClick={() => setSelectedStoreProfile(null)}>Fechar</button>
-              <div className="store-profile-card public-store-profile-card">
-                <div className="store-profile-cover">
-                  {selectedStoreProfile.cover_url ? <img src={selectedStoreProfile.cover_url} alt="" /> : <span>Foto de capa da vitrine</span>}
-                </div>
-                <div className="store-profile-main">
-                  <div className="store-profile-logo">
-                    {selectedStoreProfile.logo_url ? <img src={selectedStoreProfile.logo_url} alt={selectedStoreProfile.name} /> : <span>{selectedStoreProfile.name?.charAt(0) || "L"}</span>}
-                  </div>
-                  <div className="store-profile-copy">
-                    <span className="store-status verified">Loja verificada</span>
-                    <h2>{selectedStoreProfile.name}</h2>
-                    <p>{selectedStoreProfile.description || "Loja parceira com produtos infantis, promocoes e artigos para maes."}</p>
-                    <div className="store-profile-meta">
-                      <span>{selectedStoreProfile.city || "Cidade nao informada"}</span>
-                      <span>{getStoreProductCount(selectedStoreProfile)} produtos na vitrine</span>
-                      <span>{selectedStoreProfileRating ? `${selectedStoreProfileRating} estrelas` : "Sem avaliacoes"}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <section className="store-public-stats">
-                <div>
-                  <span>Nota da loja</span>
-                  <strong>{selectedStoreProfileRating || "Nova"}</strong>
-                </div>
-                <div>
-                  <span>Avaliacoes</span>
-                  <strong>{selectedStoreProfileReviews.length}</strong>
-                </div>
-                <div>
-                  <span>Produtos</span>
-                  <strong>{getStoreProductCount(selectedStoreProfile)}</strong>
-                </div>
+                )}
               </section>
 
-              <section className="store-public-reviews">
-                <div className="section-title-row">
-                  <div>
-                    <span className="eyebrow">Experiencia das maes</span>
-                    <h2>Avaliacoes de quem comprou</h2>
-                  </div>
-                  {selectedStoreProfileRating && <span className="review-stars">{renderStars(selectedStoreProfileRating)}</span>}
-                </div>
-                {selectedStoreProfileReviews.length === 0 ? (
-                  <p className="empty-state">Esta loja ainda nao recebeu avaliacoes de compras dentro do materniaClub.</p>
+              {/* STORE REVIEWS */}
+              <section className="store-reviews-section">
+                <h2>Avaliações de Clientes</h2>
+                {getStoreReviews(selectedStore).length === 0 ? (
+                  <p className="empty-state">Essa loja ainda não possui avaliações públicas.</p>
                 ) : (
                   <div className="review-list">
-                    {selectedStoreProfileReviews.map((review) => (
+                    {getStoreReviews(selectedStore).map((review) => (
                       <article className="review-card" key={review.id}>
                         <div className="review-author">
                           <span className="profile-avatar-small">
-                            {review.reviewer?.avatar_url ? <img src={review.reviewer.avatar_url} alt="" /> : review.reviewer?.full_name?.charAt(0) || "M"}
+                            {review.reviewer?.avatar_url ? (
+                              <img src={review.reviewer.avatar_url} alt="" />
+                            ) : (
+                              review.reviewer?.full_name?.charAt(0) || "M"
+                            )}
                           </span>
                           <div>
-                            <strong>{review.reviewer?.full_name || "Mae da comunidade"}</strong>
+                            <strong>{review.reviewer?.full_name || "Cliente materniaClub"}</strong>
                             <span className="review-stars">{renderStars(review.rating)}</span>
                           </div>
                         </div>
@@ -885,53 +617,494 @@ function Lojas() {
                 )}
               </section>
             </section>
-          </div>
-        )}
+          ) : (
+            /* ALL STORES GRID */
+            <section className="stores-directory">
+              <div className="stores-search-bar">
+                <input
+                  type="search"
+                  placeholder="Buscar loja por nome, cidade ou especialidade..."
+                  value={storeSearch}
+                  onChange={(e) => setStoreSearch(e.target.value)}
+                />
+              </div>
 
-        {selectedProduct && (
-          <div className="product-detail-backdrop" role="presentation" onClick={() => setSelectedProduct(null)}>
-            <section className="product-detail-modal" onClick={(event) => event.stopPropagation()}>
-              <button className="product-detail-close" type="button" onClick={() => setSelectedProduct(null)}>Fechar</button>
-              <div className="product-detail-media">
-                {selectedProduct.image_url ? (
-                  <img src={selectedProduct.image_url} alt={selectedProduct.title} />
-                ) : (
-                  <span>Sem foto</span>
-                )}
-                {selectedProduct.status === "sold" && <span className="unavailable-ribbon">Nao disponivel</span>}
-              </div>
-              <div className="product-detail-info">
-                <span className="eyebrow">{selectedProduct.category || "produto"}</span>
-                <h2>{selectedProduct.title}</h2>
-                <strong>{formatPrice(selectedProduct.price)}</strong>
-                <div className="product-detail-meta">
-                  <span>{selectedProduct.stores?.name || selectedProduct.profiles?.full_name || "Loja parceira"}</span>
-                  <span>{selectedProduct.city || "Cidade nao informada"}</span>
-                  <span>{selectedProduct.status === "sold" ? "Nao disponivel" : "Disponivel"}</span>
+              {filteredStores.length === 0 ? (
+                <div className="empty-state-card">
+                  <h3>Nenhuma loja parceira encontrada.</h3>
+                  <p>Cadastre sua loja para ser a primeira a aparecer na vitrine!</p>
                 </div>
-                <p>{selectedProduct.description || "Esta loja ainda nao adicionou detalhes para este produto."}</p>
-                <div className="product-detail-actions">
-                  {selectedProduct.seller_id !== session?.user?.id && selectedProduct.status !== "sold" && (
-                    <button className="primary-button" onClick={() => {
-                      setSelectedProduct(null);
-                      startStoreConversation(selectedProduct);
-                    }}>Comprar</button>
-                  )}
-                  {selectedProduct.seller_id === session?.user?.id && (
-                    <>
-                      <button className="soft-button" onClick={() => startEdit(selectedProduct)}>Editar produto</button>
-                      <button className="soft-button" onClick={() => updateProductStatus(selectedProduct, selectedProduct.status === "sold" ? "active" : "sold")}>
-                        {selectedProduct.status === "sold" ? "Liberar venda" : "Marcar vendido"}
-                      </button>
-                      <button className="danger-button" onClick={() => deleteProduct(selectedProduct)}>Excluir</button>
-                    </>
-                  )}
+              ) : (
+                <div className="stores-grid">
+                  {filteredStores.map((item) => (
+                    <article
+                      className="store-card-item"
+                      key={item.id}
+                      onClick={() => setSelectedStore(item)}
+                    >
+                      <div className="store-card-cover">
+                        {item.cover_url ? (
+                          <img src={item.cover_url} alt="" />
+                        ) : (
+                          <div className="cover-placeholder" />
+                        )}
+                        <div className="store-card-logo">
+                          {item.logo_url ? <img src={item.logo_url} alt="" /> : item.name.charAt(0)}
+                        </div>
+                      </div>
+
+                      <div className="store-card-body">
+                        <div className="store-card-title">
+                          <h3>{item.name}</h3>
+                          <span className="badge-verified">✓</span>
+                        </div>
+                        <p className="store-card-city">{item.city || "Brasil"}</p>
+                        <p className="store-card-desc">{item.description || "Produtos infantis selecionados."}</p>
+
+                        <div className="store-card-footer">
+                          <span>{getStoreProductCount(item)} produtos</span>
+                          <button type="button" className="primary-button small">
+                            Ver Vitrine →
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
                 </div>
-              </div>
+              )}
             </section>
-          </div>
-        )}
-      </div>
+          )}
+        </>
+      )}
+
+      {/* VIEW: MANAGE / REGISTER */}
+      {activeView === "manage" && (
+        <section className="store-management-view">
+          {session?.user && profile?.account_type === "store" ? (
+            store ? (
+              /* STORE DASHBOARD */
+              <div className="store-dashboard">
+                {/* STATUS ALERT BANNER */}
+                {store.status === "pending" && (
+                  <div className="store-alert-banner alert-warning">
+                    <span className="banner-icon">⏳</span>
+                    <div>
+                      <strong>Sua loja está em análise de verificação</strong>
+                      <p>
+                        Nosso time está checando o CNPJ ({formatCNPJ(store.cnpj)}) e os dados. Assim que for
+                        aprovada, seus produtos aparecerão no Feed e na Vitrine com o selo verificado!
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {store.status === "verified" && (
+                  <div className="store-alert-banner alert-success">
+                    <span className="banner-icon">✓</span>
+                    <div>
+                      <strong>Loja Verificada e Ativa!</strong>
+                      <p>Sua loja possui o selo verde oficial de parceira confiável do materniaClub.</p>
+                    </div>
+                  </div>
+                )}
+
+                {store.status === "suspended" && (
+                  <div className="store-alert-banner alert-danger">
+                    <span className="banner-icon">✕</span>
+                    <div>
+                      <strong>Loja Temporariamente Suspensa</strong>
+                      <p>Entre em contato com a equipe de suporte para regularizar o cadastro.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* STORE PROFILE CARD */}
+                <div className="store-admin-header-card">
+                  <div className="store-admin-logo">
+                    {store.logo_url ? <img src={store.logo_url} alt="" /> : store.name.charAt(0)}
+                  </div>
+                  <div className="store-admin-info">
+                    <h2>{store.name}</h2>
+                    <p>{store.city || "Brasil"} · CNPJ: {formatCNPJ(store.cnpj)}</p>
+                    <span className={`status-pill status-${store.status}`}>
+                      {store.status === "verified"
+                        ? "Verificada"
+                        : store.status === "pending"
+                        ? "Aguardando Aprovação"
+                        : store.status}
+                    </span>
+                  </div>
+                  <div className="store-admin-actions">
+                    <button
+                      type="button"
+                      className="soft-button"
+                      onClick={() => setIsStoreEditOpen(!isStoreEditOpen)}
+                    >
+                      {isStoreEditOpen ? "Fechar Edição" : "Editar Dados da Loja"}
+                    </button>
+                    {store.status === "verified" && (
+                      <button type="button" className="primary-button" onClick={openProductCreate}>
+                        + Novo Produto
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* EDIT STORE FORM */}
+                {isStoreEditOpen && (
+                  <form className="listing-form store-edit-form" onSubmit={saveStore}>
+                    <h3>Editar Perfil da Loja</h3>
+                    <div className="form-group">
+                      <label className="form-label">Nome da Loja</label>
+                      <input name="name" required value={storeForm.name} onChange={updateStoreForm} />
+                    </div>
+                    <div className="form-grid">
+                      <div className="form-group">
+                        <label className="form-label">CNPJ</label>
+                        <input name="cnpj" required value={storeForm.cnpj} onChange={updateStoreForm} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Cidade / Estado</label>
+                        <input name="city" value={storeForm.city} onChange={updateStoreForm} />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Descrição da Loja</label>
+                      <textarea
+                        name="description"
+                        rows={3}
+                        value={storeForm.description}
+                        onChange={updateStoreForm}
+                      />
+                    </div>
+                    <div className="form-grid">
+                      <div className="form-group">
+                        <label className="form-label">Logotipo da Loja</label>
+                        <label className="image-picker">
+                          <input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
+                          <span>{logoFile ? logoFile.name : "Alterar Logotipo"}</span>
+                        </label>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Imagem de Capa</label>
+                        <label className="image-picker">
+                          <input type="file" accept="image/*" onChange={(e) => setCoverFile(e.target.files?.[0] || null)} />
+                          <span>{coverFile ? coverFile.name : "Alterar Capa"}</span>
+                        </label>
+                      </div>
+                    </div>
+                    <button className="primary-button" disabled={saving}>
+                      {saving ? "Salvando..." : "Salvar Alterações da Loja"}
+                    </button>
+                  </form>
+                )}
+
+                {/* MY PRODUCTS LIST */}
+                <section className="store-inventory-section">
+                  <div className="store-panel-title">
+                    <div>
+                      <span className="eyebrow">Vitrine</span>
+                      <h2>Produtos cadastrados da sua loja</h2>
+                    </div>
+                    <strong>{myProducts.length} itens</strong>
+                  </div>
+
+                  {myProducts.length === 0 ? (
+                    <div className="empty-state-card">
+                      <h3>Nenhum produto cadastrado ainda.</h3>
+                      <p>
+                        {store.status === "verified"
+                          ? "Clique em '+ Novo Produto' para começar a vender para as mães!"
+                          : "Assim que sua loja for verificada, você poderá cadastrar seus produtos aqui."}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="inventory-grid">
+                      {myProducts.map((p) => (
+                        <article className="inventory-card" key={p.id}>
+                          <div className="inventory-media">
+                            {p.image_url ? <img src={p.image_url} alt="" /> : <span>Sem foto</span>}
+                          </div>
+                          <div className="inventory-info">
+                            <h4>{p.title}</h4>
+                            <strong>
+                              {Number(p.price).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                            </strong>
+                            <p>{p.category} · {p.city || store.city}</p>
+                            <span className={`status-tag status-${p.status}`}>
+                              {p.status === "active" ? "Disponível" : "Vendido/Esgotado"}
+                            </span>
+                            <div className="inventory-actions">
+                              <button type="button" className="ghost-button small" onClick={() => startEdit(p)}>
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                className="soft-button small"
+                                onClick={() => updateProductStatus(p, p.status === "active" ? "sold" : "active")}
+                              >
+                                {p.status === "active" ? "Esgotar" : "Reativar"}
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost-button danger-text small"
+                                onClick={() => deleteProduct(p)}
+                              >
+                                Excluir
+                              </button>
+                            </div>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </div>
+            ) : (
+              /* STORE ONBOARDING FORM */
+              <form className="listing-form" onSubmit={saveStore}>
+                <h2>Cadastre sua Loja Parceira</h2>
+                <p>Preencha os dados da sua empresa para solicitar verificação.</p>
+
+                <div className="form-group">
+                  <label className="form-label">Nome Fantasia da Loja</label>
+                  <input
+                    name="name"
+                    required
+                    placeholder="Ex: Baby Store Oficial"
+                    value={storeForm.name}
+                    onChange={updateStoreForm}
+                  />
+                </div>
+
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">CNPJ (14 números)</label>
+                    <input
+                      name="cnpj"
+                      required
+                      inputMode="numeric"
+                      placeholder="00.000.000/0000-00"
+                      value={storeForm.cnpj}
+                      onChange={updateStoreForm}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Cidade / Estado</label>
+                    <input
+                      name="city"
+                      placeholder="Ex: Campinas - SP"
+                      value={storeForm.city}
+                      onChange={updateStoreForm}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Sobre a Loja</label>
+                  <textarea
+                    name="description"
+                    rows={3}
+                    placeholder="Conte sobre sua loja, tipos de produtos e atendimento..."
+                    value={storeForm.description}
+                    onChange={updateStoreForm}
+                  />
+                </div>
+
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Logotipo</label>
+                    <label className="image-picker">
+                      <input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
+                      <span>{logoFile ? logoFile.name : "Upload do Logotipo"}</span>
+                    </label>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Banner / Capa</label>
+                    <label className="image-picker">
+                      <input type="file" accept="image/*" onChange={(e) => setCoverFile(e.target.files?.[0] || null)} />
+                      <span>{coverFile ? coverFile.name : "Upload da Capa"}</span>
+                    </label>
+                  </div>
+                </div>
+
+                <button className="primary-button" disabled={saving}>
+                  {saving ? "Cadastrando Loja..." : "Enviar Loja para Aprovação"}
+                </button>
+              </form>
+            )
+          ) : (
+            /* NEW STORE REGISTRATION */
+            <section className="store-register-banner-box">
+              <div className="store-pitch-card">
+                <span className="eyebrow">Expanda seu negócio</span>
+                <h2>Venda para milhares de mães no materniaClub</h2>
+                <p>
+                  Cadastre sua loja com CNPJ, ganhe o selo de Loja Verificada, exponha produtos diretamente no Feed e
+                  atenda clientes no chat da plataforma.
+                </p>
+                <div className="pitch-bullets">
+                  <div>✓ Selo verde de Loja Verificada após análise do CNPJ</div>
+                  <div>✓ Publicações automáticas dos produtos no feed principal</div>
+                  <div>✓ Canal direto de chat para vendas e entregas</div>
+                  <div>✓ Avaliações reais de clientes com notas e comentários</div>
+                </div>
+              </div>
+
+              <form className="listing-form store-signup-form" onSubmit={registerStoreAccount}>
+                <h3>Criar Conta de Loja Parceira</h3>
+
+                <div className="form-group">
+                  <label className="form-label">Nome da Loja</label>
+                  <input
+                    name="name"
+                    required
+                    placeholder="Ex: Pequenos Passos Kids"
+                    value={storeAccess.name}
+                    onChange={updateStoreAccess}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">CNPJ</label>
+                  <input
+                    name="cnpj"
+                    required
+                    inputMode="numeric"
+                    placeholder="00.000.000/0000-00"
+                    value={storeAccess.cnpj}
+                    onChange={updateStoreAccess}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Cidade</label>
+                  <input
+                    name="city"
+                    placeholder="Ex: São Paulo"
+                    value={storeAccess.city}
+                    onChange={updateStoreAccess}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Email de Acesso</label>
+                  <input
+                    name="email"
+                    required
+                    type="email"
+                    placeholder="contato@sualoja.com.br"
+                    value={storeAccess.email}
+                    onChange={updateStoreAccess}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Senha</label>
+                  <input
+                    name="password"
+                    required
+                    type="password"
+                    minLength={6}
+                    placeholder="Mínimo 6 caracteres"
+                    value={storeAccess.password}
+                    onChange={updateStoreAccess}
+                  />
+                </div>
+
+                <button className="primary-button" disabled={saving}>
+                  {saving ? "Criando Conta..." : "Cadastrar Loja e Solicitar Verificação"}
+                </button>
+              </form>
+            </section>
+          )}
+
+          {/* PRODUCT CREATION/EDIT MODAL */}
+          {isProductFormOpen && (
+            <div className="profile-modal-backdrop" role="presentation" onClick={closeProductForm}>
+              <form
+                className="listing-form listing-drawer product-form-modal"
+                onClick={(e) => e.stopPropagation()}
+                onSubmit={saveProduct}
+              >
+                <div className="drawer-header">
+                  <h2>{editingProduct ? "Editar Produto da Vitrine" : "Novo Produto na Vitrine"}</h2>
+                  <button type="button" className="ghost-button small" onClick={closeProductForm}>
+                    ✕
+                  </button>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Título do Produto</label>
+                  <input
+                    name="title"
+                    required
+                    placeholder="Ex: Kit Mamadeira Anti-Cólica 260ml"
+                    value={productForm.title}
+                    onChange={updateProductForm}
+                  />
+                </div>
+
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Preço de Venda (R$)</label>
+                    <input
+                      name="price"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      required
+                      placeholder="Ex: 89.90"
+                      value={productForm.price}
+                      onChange={updateProductForm}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Categoria</label>
+                    <select name="category" value={productForm.category} onChange={updateProductForm}>
+                      <option value="fraldas">Fraldas & Higiene</option>
+                      <option value="chupetas">Chupetas</option>
+                      <option value="mamadeiras">Mamadeiras & Copos</option>
+                      <option value="carrinho">Carrinhos</option>
+                      <option value="bebe conforto">Bebê Conforto</option>
+                      <option value="roupinhas">Roupinhas & Enxoval</option>
+                      <option value="brinquedos">Brinquedos</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Descrição do Produto</label>
+                  <textarea
+                    name="description"
+                    rows={3}
+                    placeholder="Destaque materiais, benefícios, garantia e pronta entrega..."
+                    value={productForm.description}
+                    onChange={updateProductForm}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Foto do Produto</label>
+                  <label className="image-picker">
+                    <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                    <span>{file ? file.name : "Escolher foto do produto"}</span>
+                  </label>
+                </div>
+
+                <div className="drawer-actions">
+                  <button className="primary-button" disabled={saving}>
+                    {saving ? "Salvando..." : editingProduct ? "Atualizar Produto" : "Publicar na Vitrine e Feed"}
+                  </button>
+                  <button type="button" className="ghost-button" onClick={closeProductForm}>
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }

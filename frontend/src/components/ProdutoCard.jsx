@@ -1,7 +1,19 @@
 import { useNavigate } from "react-router-dom";
 import ProductComments from "./ProductComments";
 
-function ProdutoCard({ currentUserId, interestLabel = "Tenho interesse", onDelete, onInterest, onLike, onOpenDetails, onReport, onStatusChange, produto, profilePath, userLocation }) {
+function ProdutoCard({
+  currentUserId,
+  interestLabel = "Tenho interesse",
+  onDelete,
+  onInterest,
+  onLike,
+  onOpenDetails,
+  onReport,
+  onStatusChange,
+  produto,
+  profilePath,
+  userLocation,
+}) {
   const navigate = useNavigate();
   const price = Number(produto.price ?? produto.preco ?? 0).toLocaleString("pt-BR", {
     style: "currency",
@@ -25,13 +37,17 @@ function ProdutoCard({ currentUserId, interestLabel = "Tenho interesse", onDelet
       Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
     const distance = earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-    if (distance < 1) return "a menos de 1 km de voce";
-    return `a ${Math.round(distance)} km de voce`;
+    if (distance < 1) return "📍 a menos de 1 km";
+    return `📍 a ${Math.round(distance)} km`;
   }
 
   const distanceLabel = getDistanceLabel();
 
-  function openProfile() {
+  function handleClick(e) {
+    if (e.target.closest("button") || e.target.closest("input") || e.target.closest("textarea") || e.target.closest("form")) {
+      return;
+    }
+
     if (onOpenDetails) {
       onOpenDetails(produto);
       return;
@@ -42,66 +58,98 @@ function ProdutoCard({ currentUserId, interestLabel = "Tenho interesse", onDelet
   }
 
   return (
-    <article className={isUnavailable ? "market-card clickable-card unavailable-card" : "market-card clickable-card"} onClick={openProfile}>
+    <article
+      className={`market-card clickable-card ${isUnavailable ? "unavailable-card" : ""}`}
+      onClick={handleClick}
+    >
       <div className="market-media">
         {produto.image_url || produto.imagem ? (
-          <img src={produto.image_url || produto.imagem} alt={produto.title || produto.titulo} />
+          <img src={produto.image_url || produto.imagem} alt={produto.title || produto.titulo} loading="lazy" />
         ) : (
-          <span>Sem foto</span>
+          <div className="no-media-placeholder">
+            <span>Sem foto</span>
+          </div>
         )}
-        <span className="market-category">{produto.category || "produto"}</span>
-        {isUnavailable && <span className="unavailable-ribbon">Nao disponivel</span>}
+        <span className="market-category">{produto.category || "Desapego"}</span>
+        {isUnavailable && <span className="unavailable-ribbon">Vendido</span>}
       </div>
 
       <div className="market-info">
         <div className="market-title-row">
           <div>
             <h3>{produto.title || produto.titulo}</h3>
-            <p>{produto.condition || "seminovo"} - {produto.city || "Brasil"}</p>
+            <p className="market-condition-city">
+              <span className="condition-tag">{produto.condition || "Seminovo"}</span>
+              <span>{produto.city || "Brasil"}</span>
+            </p>
           </div>
-          <strong>{price}</strong>
+          <strong className="market-price-tag">{price}</strong>
         </div>
 
         <div className="market-meta">
-          {distanceLabel && <span>{distanceLabel}</span>}
-          <span>{likesCount} {likesCount === 1 ? "curtida" : "curtidas"}</span>
+          {distanceLabel && <span className="distance-badge">{distanceLabel}</span>}
+          <span className="likes-badge">♥ {likesCount}</span>
         </div>
 
-        <p className="seller-line">Publicado por {produto.profiles?.full_name || produto.nome || "uma usuaria"}</p>
+        <p className="seller-line">
+          Por <strong>{produto.profiles?.full_name || produto.nome || "Mãe do clube"}</strong>
+        </p>
 
-        {(onLike || onInterest || onDelete || onReport) && (
-          <div className="market-actions">
+        {(onLike || onInterest || onDelete || onReport || onStatusChange) && (
+          <div className="market-actions" onClick={(e) => e.stopPropagation()}>
             {onLike && (
-              <button className={produto.liked_by_me ? "soft-button active-like" : "soft-button"} onClick={(event) => {
-                event.stopPropagation();
-                onLike(produto);
-              }}>
-                {produto.liked_by_me ? "Curtiu" : "Curtir"}
+              <button
+                type="button"
+                className={`soft-button ${produto.liked_by_me ? "active-like" : ""}`}
+                onClick={() => onLike(produto)}
+              >
+                {produto.liked_by_me ? "♥ Salvo" : "♡ Salvar"}
               </button>
             )}
-            {!isOwner && onInterest && !isUnavailable && <button className="primary-button" onClick={(event) => {
-              event.stopPropagation();
-              onInterest(produto);
-            }}>{interestLabel}</button>}
-            {!isOwner && onInterest && isUnavailable && <button className="soft-button" disabled onClick={(event) => event.stopPropagation()}>Nao disponivel</button>}
+
+            {!isOwner && onInterest && !isUnavailable && (
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => onInterest(produto)}
+              >
+                {interestLabel}
+              </button>
+            )}
+
             {isOwner && onStatusChange && (
-              <button className="soft-button" onClick={(event) => {
-                event.stopPropagation();
-                onStatusChange(produto, isUnavailable ? "active" : "sold");
-              }}>
-                {isUnavailable ? "Liberar venda" : "Marcar vendido"}
+              <button
+                type="button"
+                className="soft-button"
+                onClick={() => onStatusChange(produto, isUnavailable ? "active" : "sold")}
+              >
+                {isUnavailable ? "Liberar Venda" : "Marcar Vendido"}
               </button>
             )}
-            {isOwner && onDelete && <button className="danger-button" onClick={(event) => {
-              event.stopPropagation();
-              onDelete(produto);
-            }}>Excluir publicacao</button>}
-            {onReport && <button className="ghost-button" onClick={(event) => {
-              event.stopPropagation();
-              onReport(produto);
-            }}>Denunciar</button>}
+
+            {isOwner && onDelete && (
+              <button
+                type="button"
+                className="danger-button"
+                onClick={() => onDelete(produto)}
+              >
+                Excluir
+              </button>
+            )}
+
+            {onReport && !isOwner && (
+              <button
+                type="button"
+                className="ghost-button icon-btn-small"
+                onClick={() => onReport(produto)}
+                title="Denunciar anúncio"
+              >
+                ⚑
+              </button>
+            )}
           </div>
         )}
+
         <ProductComments currentUserId={currentUserId} product={produto} />
       </div>
     </article>

@@ -19,10 +19,12 @@ function Navbar() {
     refreshAccount();
     window.addEventListener("maternia-profile-updated", refreshAccount);
 
-    if (!supabase) return () => {
-      mounted = false;
-      window.removeEventListener("maternia-profile-updated", refreshAccount);
-    };
+    if (!supabase) {
+      return () => {
+        mounted = false;
+        window.removeEventListener("maternia-profile-updated", refreshAccount);
+      };
+    }
 
     const { data } = supabase.auth.onAuthStateChange(() => {
       refreshAccount();
@@ -36,10 +38,7 @@ function Navbar() {
   }, []);
 
   useEffect(() => {
-    if (!supabase || !account?.id) {
-      return undefined;
-    }
-
+    if (!supabase || !account?.id) return undefined;
     let mounted = true;
 
     const loadUnreadCount = async () => {
@@ -68,10 +67,7 @@ function Navbar() {
   }, [account?.id]);
 
   useEffect(() => {
-    if (!supabase || !account?.id || account.accountType !== "user") {
-      return undefined;
-    }
-
+    if (!supabase || !account?.id || account.accountType !== "user") return undefined;
     let mounted = true;
 
     const loadWallet = async () => {
@@ -89,7 +85,11 @@ function Navbar() {
 
     const channel = supabase
       .channel(`navbar-wallet-${account.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "maternia_wallets", filter: `user_id=eq.${account.id}` }, loadWallet)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "maternia_wallets", filter: `user_id=eq.${account.id}` },
+        loadWallet
+      )
       .subscribe();
 
     return () => {
@@ -104,66 +104,174 @@ function Navbar() {
     window.location.href = "/login";
   };
 
-  const visibleWalletBalance = account?.accountType === "user" && wallet.userId === account?.id ? wallet.balance : null;
+  const visibleWalletBalance =
+    account?.accountType === "user" && wallet.userId === account?.id ? wallet.balance : null;
   const coinLabel = visibleWalletBalance === 1 ? "MaterniaCoin" : "MaterniaCoins";
 
   return (
-    <header className="topbar">
-      <Link className="brand" to="/">
-        <span className="brand-mark">
-          <img src="/maternia-logo.png" alt="Logo materniaClub" />
-        </span>
-        <span>materniaClub</span>
-      </Link>
+    <>
+      <header className="topbar">
+        {/* BRAND LOGO */}
+        <Link className="brand" to="/">
+          <span className="brand-mark">
+            <img src="/maternia-logo.png" alt="Logo materniaClub" />
+          </span>
+          <span className="brand-name">
+            maternia<strong>Club</strong>
+          </span>
+        </Link>
 
-      <nav className="nav-links" aria-label="Navegacao principal">
-        {account?.accountType !== "store" && <NavLink to="/">Feed</NavLink>}
-        {account?.accountType !== "store" && <NavLink to="/marketplace">Marketplace</NavLink>}
-        <NavLink to="/lojas">Lojas</NavLink>
-        {account?.accountType !== "store" && <NavLink to="/amigos">Amigos</NavLink>}
-        <NavLink className="chat-nav-link" to="/chat">
-          Chat
-          {account && unreadCount > 0 && <span className="unread-badge" aria-label={`${unreadCount} mensagens nao lidas`}>{unreadCount}</span>}
-        </NavLink>
-        {account && account.accountType !== "store" && <NavLink to="/perfil">Perfil</NavLink>}
-        {["admin", "moderator"].includes(account?.role) && <NavLink to="/admin">Admin</NavLink>}
-      </nav>
+        {/* DESKTOP NAVIGATION LINKS */}
+        <nav className="nav-links desktop-nav" aria-label="Navegação principal">
+          {account?.accountType !== "store" && (
+            <NavLink to="/" end>
+              Feed
+            </NavLink>
+          )}
+          {account?.accountType !== "store" && (
+            <NavLink to="/marketplace">
+              Marketplace
+            </NavLink>
+          )}
+          <NavLink to="/lojas">
+            Lojas Parceiras
+          </NavLink>
+          {account?.accountType !== "store" && (
+            <NavLink to="/amigos">
+              Amigas
+            </NavLink>
+          )}
+          <NavLink className="chat-nav-link" to="/chat">
+            Chat
+            {account && unreadCount > 0 && (
+              <span className="unread-badge" aria-label={`${unreadCount} mensagens não lidas`}>
+                {unreadCount}
+              </span>
+            )}
+          </NavLink>
+          {account && account.accountType !== "store" && (
+            <NavLink to="/perfil">
+              Meu Perfil
+            </NavLink>
+          )}
+          {["admin", "moderator"].includes(account?.role) && (
+            <NavLink to="/admin" className="admin-nav-link">
+              Admin
+            </NavLink>
+          )}
+        </nav>
 
-      <div className="nav-account">
-        {!isSupabaseConfigured && <span className="status-pill">Demo</span>}
-        {account ? (
-          <div className="account-card">
-            <span className="account-avatar">
-              {account.avatarUrl ? <img src={account.avatarUrl} alt="" /> : account.initial}
-            </span>
-            <span className="account-copy">
-              <strong>Ola, {account.firstName}</strong>
-              <small>{account.email}</small>
+        {/* USER PROFILE & WALLET CHIP */}
+        <div className="nav-account">
+          {!isSupabaseConfigured && <span className="status-pill status-demo">Demo</span>}
+
+          {account ? (
+            <div className="account-chip-card">
               {visibleWalletBalance !== null && (
-                <button className="coin-balance" title="Suas moedas maternia" type="button" onClick={() => setIsWalletOpen(true)}>
-                  <span>M</span>
-                  {visibleWalletBalance} moedas
+                <button
+                  className="coin-badge-btn"
+                  title="Clique para ver suas moedas maternia"
+                  type="button"
+                  onClick={() => setIsWalletOpen(true)}
+                >
+                  <span className="coin-icon-circle">M</span>
+                  <span className="coin-value">{visibleWalletBalance}</span>
                 </button>
               )}
-            </span>
-            <button className="logout-button" onClick={logout}>Sair</button>
-          </div>
-        ) : (
-          <Link className="nav-login-button" to="/login">Entrar</Link>
-        )}
-      </div>
 
-      {visibleWalletBalance !== null && isWalletOpen && (
-        <div className="coin-modal-backdrop" role="presentation" onClick={() => setIsWalletOpen(false)}>
-          <section className="coin-modal" role="dialog" aria-modal="true" aria-label="Saldo de MaterniaCoins" onClick={(event) => event.stopPropagation()}>
-            <button className="coin-modal-close" type="button" onClick={() => setIsWalletOpen(false)}>Fechar</button>
-            <span className="coin-modal-icon">M</span>
-            <h2>Voce tem {visibleWalletBalance} {coinLabel}</h2>
-            <p>Use suas moedas em beneficios, descontos e vantagens dentro do materniaClub.</p>
-          </section>
+              <Link
+                to={account.accountType === "store" ? "/lojas?view=manage" : "/perfil"}
+                className="account-avatar-link"
+                title="Ver perfil"
+              >
+                <span className="account-avatar">
+                  {account.avatarUrl ? <img src={account.avatarUrl} alt="" /> : account.initial}
+                </span>
+                <span className="account-text-info">
+                  <strong>{account.firstName}</strong>
+                  <small>{account.accountType === "store" ? "Loja Parceira" : "Mãe do Clube"}</small>
+                </span>
+              </Link>
+
+              <button className="logout-icon-btn" onClick={logout} title="Sair da conta" type="button">
+                ⎋
+              </button>
+            </div>
+          ) : (
+            <Link className="nav-login-button" to="/login">
+              Entrar / Cadastrar
+            </Link>
+          )}
         </div>
-      )}
-    </header>
+
+        {/* COIN WALLET MODAL */}
+        {visibleWalletBalance !== null && isWalletOpen && (
+          <div className="coin-modal-backdrop" role="presentation" onClick={() => setIsWalletOpen(false)}>
+            <section
+              className="coin-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Saldo de MaterniaCoins"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button className="coin-modal-close" type="button" onClick={() => setIsWalletOpen(false)}>
+                ✕
+              </button>
+              <div className="coin-modal-icon">M</div>
+              <h2>
+                Você possui {visibleWalletBalance} {coinLabel}
+              </h2>
+              <p>
+                As <strong>MaterniaCoins</strong> são moedas exclusivas de fidelidade do clube! Use-as em descontos
+                especiais de lojas parceiras, benefícios em eventos e vantagens dentro da comunidade.
+              </p>
+              <div className="coin-modal-tips">
+                <span>💡 Ganhe mais moedas participando ativamente do clube!</span>
+              </div>
+            </section>
+          </div>
+        )}
+      </header>
+
+      {/* MOBILE BOTTOM NAVIGATION BAR */}
+      <nav className="mobile-bottom-bar" aria-label="Navegação móvel">
+        {account?.accountType !== "store" && (
+          <NavLink to="/" end className={({ isActive }) => `mobile-nav-item ${isActive ? "active" : ""}`}>
+            <span className="mobile-nav-icon">🏠</span>
+            <span>Feed</span>
+          </NavLink>
+        )}
+        {account?.accountType !== "store" && (
+          <NavLink to="/marketplace" className={({ isActive }) => `mobile-nav-item ${isActive ? "active" : ""}`}>
+            <span className="mobile-nav-icon">🛍️</span>
+            <span>Desapegos</span>
+          </NavLink>
+        )}
+        <NavLink to="/lojas" className={({ isActive }) => `mobile-nav-item ${isActive ? "active" : ""}`}>
+          <span className="mobile-nav-icon">🏬</span>
+          <span>Lojas</span>
+        </NavLink>
+        <NavLink to="/chat" className={({ isActive }) => `mobile-nav-item ${isActive ? "active" : ""}`}>
+          <span className="mobile-nav-icon">
+            💬
+            {account && unreadCount > 0 && <span className="mobile-unread-dot">{unreadCount}</span>}
+          </span>
+          <span>Chat</span>
+        </NavLink>
+        {account && account.accountType !== "store" && (
+          <NavLink to="/perfil" className={({ isActive }) => `mobile-nav-item ${isActive ? "active" : ""}`}>
+            <span className="mobile-nav-icon">👤</span>
+            <span>Perfil</span>
+          </NavLink>
+        )}
+        {["admin", "moderator"].includes(account?.role) && (
+          <NavLink to="/admin" className={({ isActive }) => `mobile-nav-item ${isActive ? "active" : ""}`}>
+            <span className="mobile-nav-icon">⚙️</span>
+            <span>Admin</span>
+          </NavLink>
+        )}
+      </nav>
+    </>
   );
 }
 

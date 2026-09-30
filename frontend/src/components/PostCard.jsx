@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
+import { useToast } from "../lib/toastContext";
 
 function PostCard({ post, onDelete, onInterest, onLike, onReport, onStatusChange, onUpdate, currentUserId }) {
   const navigate = useNavigate();
-  const [commentsOpen, setCommentsOpen] = useState(true);
+  const { toast, showConfirm } = useToast();
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const [comments, setComments] = useState([]);
   const [commentBody, setCommentBody] = useState("");
   const [editingPost, setEditingPost] = useState(false);
@@ -14,13 +16,14 @@ function PostCard({ post, onDelete, onInterest, onLike, onReport, onStatusChange
   const [editFile, setEditFile] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editingBody, setEditingBody] = useState("");
-  const [loadingComments, setLoadingComments] = useState(true);
+  const [loadingComments, setLoadingComments] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+
   const isStorePublication = post.is_store_publication || post.profiles?.account_type === "store";
   const isStoreProduct = Boolean(post.store_product_id);
   const isUnavailable = post.status === "sold";
-  const author = post.profiles?.full_name || "Mae da comunidade";
-  const city = post.profiles?.city || "materniaClub";
+  const author = post.profiles?.full_name || "Mãe da comunidade";
+  const city = post.profiles?.city || "Brasil";
   const date = post.created_at
     ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(post.created_at))
     : "";
@@ -32,7 +35,11 @@ function PostCard({ post, onDelete, onInterest, onLike, onReport, onStatusChange
     ? Number(post.price).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
     : null;
 
-  function openProfile() {
+  function openProfile(e) {
+    if (e.target.closest("button") || e.target.closest("input") || e.target.closest("textarea") || e.target.closest("form")) {
+      return;
+    }
+
     if (isStorePublication) {
       const storeQuery = post.store_id ? `?store=${post.store_id}${post.store_product_id ? `&produto=${post.store_product_id}` : ""}` : "";
       navigate(`/lojas${storeQuery}`);
@@ -47,17 +54,25 @@ function PostCard({ post, onDelete, onInterest, onLike, onReport, onStatusChange
       return;
     }
     setLoadingComments(true);
-    const { data, error } = await supabase.from("comments").select("*, profiles(full_name, avatar_url)").eq("post_id", post.id).eq("status", "published").order("created_at", { ascending: true });
-    if (error) alert(error.message);
-    else setComments(data || []);
+    const { data, error } = await supabase
+      .from("comments")
+      .select("*, profiles(full_name, avatar_url)")
+      .eq("post_id", post.id)
+      .eq("status", "published")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.warn("Erro ao carregar comentários:", error.message);
+    } else {
+      setComments(data || []);
+    }
     setLoadingComments(false);
   }
 
   useEffect(() => {
-    if (!supabase || !post.id || isStoreProduct) {
-      return undefined;
-    }
+    if (!supabase || !post.id || isStoreProduct) return undefined;
     let active = true;
+
     supabase
       .from("comments")
       .select("*, profiles(full_name, avatar_url)")
@@ -67,7 +82,6 @@ function PostCard({ post, onDelete, onInterest, onLike, onReport, onStatusChange
       .then(({ data, error }) => {
         if (!active) return;
         if (!error) setComments(data || []);
-        setLoadingComments(false);
       });
 
     return () => {
@@ -90,10 +104,24 @@ function PostCard({ post, onDelete, onInterest, onLike, onReport, onStatusChange
   async function createComment(event) {
     event.preventDefault();
     event.stopPropagation();
-    if (!currentUserId) return alert("Faca login para comentar.");
+    if (!currentUserId) {
+      toast.info("Faça login para comentar nesta publicação.");
+      return;
+    }
     if (!commentBody.trim()) return;
-    const { error } = await supabase.from("comments").insert({ user_id: currentUserId, post_id: post.id, body: commentBody.trim() });
-    if (error) return alert(error.message);
+
+    const { error } = await supabase.from("comments").insert({
+      user_id: currentUserId,
+      post_id: post.id,
+      body: commentBody.trim(),
+    });
+
+    if (error) {
+      toast.error("Erro ao enviar comentário: " + error.message);
+      return;
+    }
+
+    toast.success("Comentário publicado!");
     setCommentBody("");
     loadComments();
   }
@@ -102,8 +130,14 @@ function PostCard({ post, onDelete, onInterest, onLike, onReport, onStatusChange
     event.preventDefault();
     event.stopPropagation();
     if (!editingBody.trim()) return;
+
     const { error } = await supabase.from("comments").update({ body: editingBody.trim() }).eq("id", commentId);
-    if (error) return alert(error.message);
+    if (error) {
+      toast.error("Erro ao salvar comentário: " + error.message);
+      return;
+    }
+
+    toast.success("Comentário editado!");
     setEditingId(null);
     setEditingBody("");
     loadComments();
@@ -111,9 +145,16 @@ function PostCard({ post, onDelete, onInterest, onLike, onReport, onStatusChange
 
   async function deleteComment(event, commentId) {
     event.stopPropagation();
-    if (!window.confirm("Apagar este comentario?")) return;
+    const confirmed = await showConfirm("Excluir comentário", "Deseja realmente apagar este comentário?", "Excluir", "Cancelar", true);
+    if (!confirmed) return;
+
     const { error } = await supabase.from("comments").delete().eq("id", commentId);
-    if (error) return alert(error.message);
+    if (error) {
+      toast.error("Erro ao apagar: " + error.message);
+      return;
+    }
+
+    toast.success("Comentário excluído.");
     setComments((current) => current.filter((comment) => comment.id !== commentId));
   }
 
@@ -130,136 +171,265 @@ function PostCard({ post, onDelete, onInterest, onLike, onReport, onStatusChange
     event.preventDefault();
     event.stopPropagation();
     if (!editBody.trim()) return;
+
     await onUpdate?.(post, {
       body: editBody,
       price: editPrice,
       category: editCategory,
       image_url: post.image_url || post.imagem || null,
     }, editFile);
+
     setEditingPost(false);
     setEditFile(null);
   }
 
   return (
-    <article className={isUnavailable ? "post-card clickable-card unavailable-card" : "post-card clickable-card"} onClick={openProfile}>
+    <article
+      className={`post-card clickable-card ${isUnavailable ? "unavailable-card" : ""} ${isStorePublication ? "store-sponsored-card" : ""}`}
+      onClick={openProfile}
+    >
+      {/* HEADER */}
       <div className="card-header">
-        <div className="avatar">
-          {post.profiles?.avatar_url ? <img src={post.profiles.avatar_url} alt="" /> : author.charAt(0)}
-        </div>
-        <div>
-          <div className="post-author-line">
-            <h3>{author}</h3>
-            {isStorePublication && post.is_verified_store ? (<span className="verified-store-badge" title="Loja analisada e aprovada pelo admin"><span aria-hidden="true">OK</span> Loja verificada</span>) : isStorePublication ? (<span className="store-offer-badge">Oferta de loja</span>) : null}
+        <div className="avatar-wrapper">
+          <div className="avatar">
+            {post.profiles?.avatar_url ? <img src={post.profiles.avatar_url} alt="" /> : author.charAt(0)}
           </div>
-          <p>{city} · {date}</p>
+          {isStorePublication && <span className="store-badge-indicator" title="Loja Verificada">✓</span>}
         </div>
-        <span className="tag">{post.category || "conversa"}</span>
+
+        <div className="card-header-info">
+          <div className="post-author-line">
+            <strong>{author}</strong>
+            {isStorePublication ? (
+              <span className="verified-store-tag">Loja Verificada</span>
+            ) : (
+              <span className="user-city-tag">{city}</span>
+            )}
+          </div>
+          <div className="post-meta-line">
+            <span className="post-category-tag">{post.category || "Promoção"}</span>
+            {date && <span className="post-date-tag">{date}</span>}
+          </div>
+        </div>
+
+        {/* TOP ACTIONS */}
+        <div className="card-header-actions" onClick={(e) => e.stopPropagation()}>
+          {onReport && (
+            <button
+              type="button"
+              className="ghost-button icon-btn-small"
+              onClick={() => onReport(post)}
+              title="Denunciar publicação"
+            >
+              ⚑
+            </button>
+          )}
+          {isOwner && canEditPost && !editingPost && (
+            <button
+              type="button"
+              className="ghost-button icon-btn-small"
+              onClick={startPostEdit}
+              title="Editar (disponível por 5 min)"
+            >
+              ✎
+            </button>
+          )}
+          {isOwner && onDelete && (
+            <button
+              type="button"
+              className="ghost-button danger-text icon-btn-small"
+              onClick={() => onDelete(post)}
+              title="Excluir publicação"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
+      {/* EDIT FORM (INLINE) */}
       {editingPost ? (
-        <form className="post-edit-form" onClick={(event) => event.stopPropagation()} onSubmit={savePostEdit}>
-          <textarea value={editBody} onChange={(event) => setEditBody(event.target.value)} />
-          <div className="form-grid">
-            <input type="number" min="0" step="0.01" placeholder="Valor do produto" value={editPrice} onChange={(event) => setEditPrice(event.target.value)} />
-            <select value={editCategory} onChange={(event) => setEditCategory(event.target.value)}>
-              <option value="promocao">Promocao</option>
-              <option value="duvida">Duvida</option>
+        <form className="post-edit-inline" onSubmit={savePostEdit} onClick={(e) => e.stopPropagation()}>
+          <textarea
+            value={editBody}
+            onChange={(e) => setEditBody(e.target.value)}
+            required
+            rows={3}
+          />
+          <div className="edit-inline-row">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Preço (opcional)"
+              value={editPrice}
+              onChange={(e) => setEditPrice(e.target.value)}
+            />
+            <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)}>
+              <option value="promocao">Promoção</option>
+              <option value="duvida">Dúvida</option>
               <option value="desapego">Desapego</option>
-              <option value="experiencia">Experiencia</option>
+              <option value="experiencia">Experiência</option>
             </select>
           </div>
-          <label className="image-picker">
-            <input type="file" accept="image/*" onChange={(event) => setEditFile(event.target.files?.[0] || null)} />
-            <span>{editFile ? editFile.name : "Trocar imagem da publicacao"}</span>
-          </label>
-          <div className="card-actions">
-            <button className="primary-button small">Salvar edicao</button>
-            <button className="ghost-button small" type="button" onClick={() => setEditingPost(false)}>Cancelar</button>
+          <div className="edit-inline-actions">
+            <button type="submit" className="primary-button small">Salvar Alterações</button>
+            <button type="button" className="ghost-button small" onClick={() => setEditingPost(false)}>Cancelar</button>
           </div>
         </form>
       ) : (
-        <div>
-          {isUnavailable && <span className="unavailable-inline">Nao disponivel</span>}
-          {isStoreProduct && <h3 className="store-product-title">{post.title}</h3>}
-          <p className="post-body">{post.body || post.texto}</p>
+        /* POST CONTENT */
+        <div className="post-content">
+          <p className="post-text">{post.body || post.texto}</p>
+
+          {price && (
+            <div className="post-price-badge">
+              <span className="price-label">Oferta:</span>
+              <strong>{price}</strong>
+            </div>
+          )}
+
+          {(post.image_url || post.imagem) && (
+            <div className="post-image-box">
+              <img src={post.image_url || post.imagem} alt="Foto da publicação" loading="lazy" />
+            </div>
+          )}
         </div>
       )}
 
-      {price && <strong className="post-price">{price}</strong>}
-
-      {post.image_url || post.imagem ? (
-        <div className="post-image-wrap">
-          <img className="post-image" src={post.image_url || post.imagem} alt="Publicacao da comunidade" />
-          {isUnavailable && <span className="unavailable-ribbon">Nao disponivel</span>}
-        </div>
-      ) : null}
-
-      <div className="card-actions">
-        {!isStoreProduct && <span className="post-like-count">{likesCount} {likesCount === 1 ? "curtida" : "curtidas"}</span>}
-        {isStoreProduct && <span className="store-offer-label">Patrocinado · Oferta de loja</span>}
-        {isStoreProduct && !isUnavailable && <button className="soft-button small" onClick={(event) => {
-          event.stopPropagation();
-          openProfile();
-        }}>Ver oferta</button>}
-        {isStoreProduct && !isUnavailable && !isOwner && onInterest && <button className="primary-button small" onClick={(event) => {
-          event.stopPropagation();
-          onInterest(post);
-        }}>Comprar</button>}
-        {isStoreProduct && isUnavailable && <button className="soft-button small" disabled onClick={(event) => event.stopPropagation()}>Nao disponivel</button>}
+      {/* ACTION BAR */}
+      <div className="card-actions-bar" onClick={(e) => e.stopPropagation()}>
         {onLike && (
-          <button className={post.liked_by_me ? "soft-button active-like" : "soft-button"} onClick={(event) => {
-            event.stopPropagation();
-            onLike(post);
-          }}>
-            {post.liked_by_me ? "Curtiu" : "Curtir"}
+          <button
+            type="button"
+            className={`action-button ${post.liked_by_me ? "active-liked" : ""}`}
+            onClick={() => onLike(post)}
+          >
+            <span className="action-icon">{post.liked_by_me ? "♥" : "♡"}</span>
+            <span>{likesCount} {likesCount === 1 ? "Curtida" : "Curtidas"}</span>
           </button>
         )}
-        {!isStoreProduct && <button className="soft-button" onClick={toggleComments}>{commentsOpen ? "Ocultar comentarios" : "Ver comentarios"}</button>}
-        {onReport && <button className="ghost-button" onClick={(event) => {
-          event.stopPropagation();
-          onReport?.(post);
-        }}>Denunciar</button>}
-        {isOwner && onStatusChange && <button className="soft-button" onClick={(event) => {
-          event.stopPropagation();
-          onStatusChange(post, isUnavailable ? (isStoreProduct ? "active" : "published") : "sold");
-        }}>{isUnavailable ? "Liberar venda" : "Marcar vendido"}</button>}
-        {isOwner && canEditPost && onUpdate && <button className="soft-button" onClick={startPostEdit}>Editar publicacao</button>}
-        {isOwner && onDelete && <button className="danger-button" onClick={(event) => {
-          event.stopPropagation();
-          onDelete(post);
-        }}>Excluir publicacao</button>}
-        {isOwner && !canEditPost && <span className="post-lock-note">Edicao encerrada</span>}
+
+        {!isStoreProduct && (
+          <button
+            type="button"
+            className="action-button"
+            onClick={toggleComments}
+          >
+            <span className="action-icon">💬</span>
+            <span>{comments.length} {comments.length === 1 ? "Comentário" : "Comentários"}</span>
+          </button>
+        )}
+
+        {isStorePublication && (
+          <button
+            type="button"
+            className="primary-button small store-buy-btn"
+            onClick={() => {
+              if (onInterest) onInterest(post);
+              else openProfile({ target: {} });
+            }}
+          >
+            {isStoreProduct ? "Comprar / Conversar com Loja" : "Ver Loja Parceira"}
+          </button>
+        )}
+
+        {isOwner && onStatusChange && (
+          <button
+            type="button"
+            className="soft-button small"
+            onClick={() => onStatusChange(post, isUnavailable ? "published" : "sold")}
+          >
+            {isUnavailable ? "Reativar Publicação" : "Marcar Vendido"}
+          </button>
+        )}
       </div>
 
-      {!isStoreProduct && commentsOpen && <section className="comments-panel" onClick={(event) => event.stopPropagation()}>
-        <h4>Comentarios</h4>
-        {loadingComments ? <p className="hint">Carregando comentarios...</p> : comments.length === 0 ? <p className="hint">Seja a primeira pessoa a comentar.</p> : <div className="comment-list">
-          {comments.map((comment) => <article className="comment-item" key={comment.id}>
-            <div className="comment-avatar">
-              {comment.profiles?.avatar_url ? <img src={comment.profiles.avatar_url} alt="" /> : comment.profiles?.full_name?.charAt(0) || "M"}
+      {/* COMMENTS SECTION */}
+      {commentsOpen && !isStoreProduct && (
+        <div className="post-comments-wrapper" onClick={(e) => e.stopPropagation()}>
+          <div className="comments-header">
+            <h4>Comentários da Comunidade</h4>
+          </div>
+
+          {loadingComments ? (
+            <p className="hint">Carregando comentários...</p>
+          ) : comments.length === 0 ? (
+            <p className="hint">Ainda não há comentários. Seja a primeira a responder!</p>
+          ) : (
+            <div className="comments-thread">
+              {comments.map((comment) => (
+                <div className="comment-bubble" key={comment.id}>
+                  <div className="comment-avatar">
+                    {comment.profiles?.avatar_url ? (
+                      <img src={comment.profiles.avatar_url} alt="" />
+                    ) : (
+                      comment.profiles?.full_name?.charAt(0) || "M"
+                    )}
+                  </div>
+                  <div className="comment-body-area">
+                    <div className="comment-meta-user">
+                      <strong>{comment.profiles?.full_name || "Mãe da comunidade"}</strong>
+                    </div>
+
+                    {editingId === comment.id ? (
+                      <form className="comment-edit-inline" onSubmit={(e) => saveComment(e, comment.id)}>
+                        <input
+                          value={editingBody}
+                          onChange={(e) => setEditingBody(e.target.value)}
+                          autoFocus
+                        />
+                        <button className="primary-button small">Salvar</button>
+                        <button type="button" className="ghost-button small" onClick={() => setEditingId(null)}>
+                          Cancelar
+                        </button>
+                      </form>
+                    ) : (
+                      <p>{comment.body}</p>
+                    )}
+
+                    {comment.user_id === currentUserId && editingId !== comment.id && (
+                      <div className="comment-inline-actions">
+                        <button
+                          type="button"
+                          className="ghost-button text-btn"
+                          onClick={() => {
+                            setEditingId(comment.id);
+                            setEditingBody(comment.body);
+                          }}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-button text-btn danger-text"
+                          onClick={(e) => deleteComment(e, comment.id)}
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="comment-content">
-              <strong>{comment.profiles?.full_name || "Mae da comunidade"}</strong>
-              {editingId === comment.id ? <form className="comment-edit-form" onSubmit={(event) => saveComment(event, comment.id)}>
-                <input value={editingBody} onChange={(event) => setEditingBody(event.target.value)} autoFocus />
-                <button className="primary-button small">Salvar</button>
-                <button className="ghost-button" type="button" onClick={() => setEditingId(null)}>Cancelar</button>
-              </form> : <p>{comment.body}</p>}
-              {comment.user_id === currentUserId && editingId !== comment.id && <div className="comment-actions">
-                <button className="ghost-button" onClick={() => { setEditingId(comment.id); setEditingBody(comment.body); }}>Editar</button>
-                <button className="ghost-button danger-text" onClick={(event) => deleteComment(event, comment.id)}>Apagar</button>
-              </div>}
-            </div>
-          </article>)}
-        </div>}
-        <form className="comment-form" onSubmit={createComment}>
-          <input placeholder={currentUserId ? "Escreva um comentario" : "Entre para comentar"} value={commentBody} onChange={(event) => setCommentBody(event.target.value)} disabled={!currentUserId} />
-          <button className="primary-button small" disabled={!currentUserId || !commentBody.trim()}>Enviar</button>
-        </form>
-      </section>}
+          )}
+
+          <form className="comment-composer-inline" onSubmit={createComment}>
+            <input
+              placeholder={currentUserId ? "Escreva uma resposta carinhosa..." : "Entre para comentar"}
+              value={commentBody}
+              onChange={(e) => setCommentBody(e.target.value)}
+              disabled={!currentUserId}
+            />
+            <button className="primary-button small" disabled={!currentUserId || !commentBody.trim()}>
+              Enviar
+            </button>
+          </form>
+        </div>
+      )}
     </article>
   );
 }
 
 export default PostCard;
-
